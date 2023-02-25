@@ -1,11 +1,29 @@
+import {
+  IconArrowForwardUp,
+  IconArrowBackUp,
+  IconCirclePlus,
+  IconCircleMinus,
+  IconFileDownload,
+} from "@tabler/icons-react";
+
 const EditorPanel = () => {
   return (
-    <div className="w-full flex justify-center gap-2 p-3">
-      <button>redo</button>
-      <button>undo</button>
-      <button>plus</button>
-      <button>minus</button>
-      <button>download</button>
+    <div className="w-full flex justify-center gap-5 py-5">
+      <button>
+        <IconArrowBackUp />
+      </button>
+      <button>
+        <IconArrowForwardUp />
+      </button>
+      <button>
+        <IconCirclePlus />
+      </button>
+      <button>
+        <IconCircleMinus />
+      </button>
+      <button>
+        <IconFileDownload />
+      </button>
     </div>
   );
 };
