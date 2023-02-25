@@ -1,11 +1,13 @@
-import "./App.css";
+import Layout from "./components/Layout";
 
-function App() {
+const App = () => {
   return (
     <div className="App">
-      <h3 className="text-red-400">image editor exam</h3>
+      <Layout>
+        <p>Img editor exam</p>
+      </Layout>
     </div>
   );
-}
+};
 
 export default App;
