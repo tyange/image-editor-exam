@@ -1,10 +1,11 @@
+import Editor from "./components/Editor";
 import Layout from "./components/Layout";
 
 const App = () => {
   return (
     <div className="App">
       <Layout>
-        <p>Img editor exam</p>
+        <Editor />
       </Layout>
     </div>
   );
