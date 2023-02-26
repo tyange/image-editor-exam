@@ -5,6 +5,7 @@ import { IconFilePlus } from "@tabler/icons-react";
 
 const Editor = () => {
   const [isDragging, setIsDragging] = useState(false);
+  const [file, setFile] = useState<File | undefined>(undefined);
 
   const handleDragEnter: DragEventHandler = (e): void => {
     e.preventDefault();
@@ -31,13 +32,24 @@ const Editor = () => {
     e.preventDefault();
     e.stopPropagation();
 
-    console.log(e.dataTransfer.files);
+    if (
+      e.dataTransfer.files[0].type !== "image/png" ||
+      "image/jpg" ||
+      "image/jpeg"
+    ) {
+      alert("파일 형식이 올바르지 않습니다");
+      return;
+    }
+
+    setFile(e.dataTransfer.files[0]);
 
     setIsDragging(false);
   };
 
   const handleFileChange: ChangeEventHandler<HTMLInputElement> = (e) => {
-    console.log(e.target.files);
+    if (e.target.files) {
+      setFile(e.target.files[0]);
+    }
   };
 
   return (
@@ -53,7 +65,12 @@ const Editor = () => {
         <div
           className={`w-full h-full flex flex-col gap-3 justify-center items-center`}
         >
-          <input type="file" className="p-3" onChange={handleFileChange} />
+          <input
+            type="file"
+            className="p-3"
+            onChange={handleFileChange}
+            accept="image/png, image/jpeg, image/jpg"
+          />
           <div className="relative w-full h-full flex justify-center items-center">
             {isDragging && (
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
