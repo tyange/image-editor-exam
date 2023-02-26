@@ -4,6 +4,7 @@ import {
   ChangeEventHandler,
   useEffect,
   useRef,
+  MouseEventHandler,
 } from "react";
 import EditorPanel from "./EditorPanel";
 
@@ -11,7 +12,14 @@ import { IconFilePlus } from "@tabler/icons-react";
 
 const Editor = () => {
   const [isDragging, setIsDragging] = useState(false);
+  const [stopUpload, setStopUpload] = useState(false);
   const [file, setFile] = useState<File | undefined>(undefined);
+
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [dptX, setDptX] = useState(0);
+  const [dptY, setDptY] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -40,6 +48,11 @@ const Editor = () => {
     e.preventDefault();
     e.stopPropagation();
 
+    if (stopUpload) {
+      preventNewImgUpload(e.dataTransfer.files[0]);
+      return;
+    }
+
     if (
       e.dataTransfer.files[0].type !== "image/png" &&
       e.dataTransfer.files[0].type !== "image/jpg" &&
@@ -55,22 +68,84 @@ const Editor = () => {
   };
 
   const handleFileChange = (e: any) => {
+    if (stopUpload) {
+      preventNewImgUpload(e.target.files[0]);
+      return;
+    }
+
     if (e.target.files) {
       setFile(e.target.files[0]);
     }
   };
 
+  const preventNewImgUpload = (file: File) => {
+    if (
+      confirm("이미 이미지가 업로드되어 있습니다. 이미지를 교체하시겠습니까?")
+    ) {
+      const currentCanvas = canvasRef.current;
+
+      const ctx = currentCanvas?.getContext("2d");
+
+      ctx?.clearRect(0, 0, currentCanvas!.width, currentCanvas!.height);
+
+      setFile(file);
+    }
+
+    return;
+  };
+
+  const handleMouseDown: MouseEventHandler<HTMLCanvasElement> = (e) => {
+    setIsSelecting(true);
+
+    const currentCanvas = canvasRef.current;
+    const boundary = currentCanvas?.getBoundingClientRect();
+
+    const startPoint = {
+      x: e.clientX - boundary!.left,
+      y: e.clientY - boundary!.top,
+    };
+
+    setStartX(Math.trunc(startPoint.x));
+    setStartY(Math.trunc(startPoint.y));
+  };
+
+  const handleSelecting: MouseEventHandler<HTMLCanvasElement> = (e) => {
+    if (!isSelecting || !file) return;
+
+    console.log("selecting");
+
+    const canvasCurrent = canvasRef.current;
+    const ctx = canvasCurrent?.getContext("2d");
+
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+
+    img.onload = () => {
+      ctx!.filter = "blur(3px)";
+      ctx?.drawImage(img, 0, 0, canvasCurrent!.width, canvasCurrent!.height);
+    };
+  };
+
+  const handleMouseUp: MouseEventHandler<HTMLCanvasElement> = (e) => {
+    setIsSelecting(false);
+  };
+
+  const drawingImgOnCanvas = (imgFile: File) => {
+    const canvasCurrent = canvasRef.current;
+    const ctx = canvasCurrent?.getContext("2d");
+
+    const img = new Image();
+    img.src = URL.createObjectURL(imgFile);
+
+    img.onload = () => {
+      ctx?.drawImage(img, 0, 0, canvasCurrent!.width, canvasCurrent!.height);
+      setStopUpload(true);
+    };
+  };
+
   useEffect(() => {
     if (file) {
-      const canvasCurrent = canvasRef.current;
-      const ctx = canvasCurrent?.getContext("2d");
-
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-
-      img.onload = () => {
-        ctx?.drawImage(img, 0, 0, canvasCurrent!.width, canvasCurrent!.height);
-      };
+      drawingImgOnCanvas(file);
     }
   }, [file]);
 
@@ -105,6 +180,9 @@ const Editor = () => {
             )}
             <canvas
               ref={canvasRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleSelecting}
+              onMouseUp={handleMouseUp}
               className={`w-5/6 h-5/6 shadow-md ${
                 isDragging && "bg-slate-300"
               }`}
