@@ -1,4 +1,9 @@
-import { useState, DragEventHandler, ChangeEventHandler } from "react";
+import {
+  useState,
+  DragEventHandler,
+  ChangeEventHandler,
+  useEffect,
+} from "react";
 import EditorPanel from "./EditorPanel";
 
 import { IconFilePlus } from "@tabler/icons-react";
@@ -33,24 +38,29 @@ const Editor = () => {
     e.stopPropagation();
 
     if (
-      e.dataTransfer.files[0].type !== "image/png" ||
-      "image/jpg" ||
-      "image/jpeg"
+      e.dataTransfer.files[0].type !== "image/png" &&
+      e.dataTransfer.files[0].type !== "image/jpg" &&
+      e.dataTransfer.files[0].type !== "image/jpeg"
     ) {
       alert("파일 형식이 올바르지 않습니다");
+      setIsDragging(false);
       return;
     }
 
     setFile(e.dataTransfer.files[0]);
-
     setIsDragging(false);
   };
 
-  const handleFileChange: ChangeEventHandler<HTMLInputElement> = (e) => {
+  const handleFileChange = (e: any) => {
     if (e.target.files) {
       setFile(e.target.files[0]);
     }
   };
+
+  useEffect(() => {
+    if (file) {
+    }
+  }, [file]);
 
   return (
     <div className="w-2/3 border h-4/5 rounded-md flex flex-col">
@@ -66,11 +76,15 @@ const Editor = () => {
           className={`w-full h-full flex flex-col gap-3 justify-center items-center`}
         >
           <input
+            id="fileInput"
             type="file"
-            className="p-3"
+            className="p-3 hidden"
             onChange={handleFileChange}
             accept="image/png, image/jpeg, image/jpg"
           />
+          <label htmlFor="fileInput" className="cursor-pointer">
+            Select File
+          </label>
           <div className="relative w-full h-full flex justify-center items-center">
             {isDragging && (
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
