@@ -1,10 +1,19 @@
-import { useState, DragEventHandler, ChangeEventHandler } from "react";
+import {
+  useState,
+  DragEventHandler,
+  ChangeEventHandler,
+  useEffect,
+  useRef,
+} from "react";
 import EditorPanel from "./EditorPanel";
 
 import { IconFilePlus } from "@tabler/icons-react";
 
 const Editor = () => {
   const [isDragging, setIsDragging] = useState(false);
+  const [file, setFile] = useState<File | undefined>(undefined);
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const handleDragEnter: DragEventHandler = (e): void => {
     e.preventDefault();
@@ -31,14 +40,39 @@ const Editor = () => {
     e.preventDefault();
     e.stopPropagation();
 
-    console.log(e.dataTransfer.files);
+    if (
+      e.dataTransfer.files[0].type !== "image/png" &&
+      e.dataTransfer.files[0].type !== "image/jpg" &&
+      e.dataTransfer.files[0].type !== "image/jpeg"
+    ) {
+      alert("파일 형식이 올바르지 않습니다");
+      setIsDragging(false);
+      return;
+    }
 
+    setFile(e.dataTransfer.files[0]);
     setIsDragging(false);
   };
 
-  const handleFileChange: ChangeEventHandler<HTMLInputElement> = (e) => {
-    console.log(e.target.files);
+  const handleFileChange = (e: any) => {
+    if (e.target.files) {
+      setFile(e.target.files[0]);
+    }
   };
+
+  useEffect(() => {
+    if (file) {
+      const canvasCurrent = canvasRef.current;
+      const ctx = canvasCurrent?.getContext("2d");
+
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+
+      img.onload = () => {
+        ctx?.drawImage(img, 0, 0, canvasCurrent!.width, canvasCurrent!.height);
+      };
+    }
+  }, [file]);
 
   return (
     <div className="w-2/3 border h-4/5 rounded-md flex flex-col">
@@ -53,7 +87,16 @@ const Editor = () => {
         <div
           className={`w-full h-full flex flex-col gap-3 justify-center items-center`}
         >
-          <input type="file" className="p-3" onChange={handleFileChange} />
+          <input
+            id="fileInput"
+            type="file"
+            className="p-3 hidden"
+            onChange={handleFileChange}
+            accept="image/png, image/jpeg, image/jpg"
+          />
+          <label htmlFor="fileInput" className="cursor-pointer">
+            Select File
+          </label>
           <div className="relative w-full h-full flex justify-center items-center">
             {isDragging && (
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -61,6 +104,7 @@ const Editor = () => {
               </div>
             )}
             <canvas
+              ref={canvasRef}
               className={`w-5/6 h-5/6 shadow-md ${
                 isDragging && "bg-slate-300"
               }`}
