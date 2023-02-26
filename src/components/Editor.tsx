@@ -3,6 +3,7 @@ import {
   DragEventHandler,
   ChangeEventHandler,
   useEffect,
+  useRef,
 } from "react";
 import EditorPanel from "./EditorPanel";
 
@@ -11,6 +12,8 @@ import { IconFilePlus } from "@tabler/icons-react";
 const Editor = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | undefined>(undefined);
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const handleDragEnter: DragEventHandler = (e): void => {
     e.preventDefault();
@@ -59,6 +62,15 @@ const Editor = () => {
 
   useEffect(() => {
     if (file) {
+      const canvasCurrent = canvasRef.current;
+      const ctx = canvasCurrent?.getContext("2d");
+
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+
+      img.onload = () => {
+        ctx?.drawImage(img, 0, 0, canvasCurrent!.width, canvasCurrent!.height);
+      };
     }
   }, [file]);
 
@@ -92,6 +104,7 @@ const Editor = () => {
               </div>
             )}
             <canvas
+              ref={canvasRef}
               className={`w-5/6 h-5/6 shadow-md ${
                 isDragging && "bg-slate-300"
               }`}
