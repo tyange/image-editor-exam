@@ -1,9 +1,9 @@
 import {
   useState,
   DragEventHandler,
-  ChangeEventHandler,
   useEffect,
   useRef,
+  MouseEvent,
 } from "react";
 import EditorPanel from "./EditorPanel";
 
@@ -14,6 +14,10 @@ const Editor = () => {
   const [file, setFile] = useState<File | undefined>(undefined);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [rectStartX, setRectStartX] = useState<number | undefined>(undefined);
+  const [rectStartY, setRectStartY] = useState<number | undefined>(undefined);
 
   const handleDragEnter: DragEventHandler = (e): void => {
     e.preventDefault();
@@ -58,6 +62,30 @@ const Editor = () => {
     if (e.target.files) {
       setFile(e.target.files[0]);
     }
+  };
+
+  const getPoint = (e: MouseEvent) => {
+    const canvas = canvasRef.current;
+
+    const canvasPosition = canvas!.getBoundingClientRect();
+
+    return {
+      px: e.clientX - canvasPosition.left,
+      py: e.clientY - canvasPosition.top,
+    };
+  };
+
+  const mouseDown = (e: MouseEvent) => {
+    e.preventDefault();
+
+    console.log("mouse down");
+
+    const { px, py } = getPoint(e);
+
+    setRectStartX(px);
+    setRectStartY(py);
+
+    setIsSelecting(true);
   };
 
   useEffect(() => {
