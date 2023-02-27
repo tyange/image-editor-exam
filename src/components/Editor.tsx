@@ -88,6 +88,12 @@ const Editor = () => {
     setIsSelecting(true);
   };
 
+  const mouseUp = (e: MouseEvent) => {
+    e.preventDefault();
+
+    setIsSelecting(false);
+  };
+
   useEffect(() => {
     if (file) {
       const canvasCurrent = canvasRef.current;
