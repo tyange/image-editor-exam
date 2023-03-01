@@ -1,10 +1,55 @@
-import { useRef } from "react";
+import {
+  ChangeEventHandler,
+  MouseEventHandler,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import EditorPanel from "./EditorPanel";
 
 const NewEditor = () => {
   const blurLayerRef = useRef<HTMLCanvasElement | null>(null);
   const originImageLayerRef = useRef<HTMLCanvasElement | null>(null);
   const dragLayerRef = useRef<HTMLCanvasElement | null>(null);
+
+  const [file, setFile] = useState<File | undefined>();
+
+  // file change handler: input(type: file) 태그에서 특정 이미지를 선택했을 경우,
+  // 해당 이미지를 file 상태로 저장.
+  const fileChangeHandler: ChangeEventHandler<HTMLInputElement> = (e) => {
+    if (e.target.files) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  // 'file' 상태가 변할 때마다 아래 useEffect 함수를 호출하여
+  // 'file' 이미지를 originImageLayer(canvas) 위에 그려냄.
+  useEffect(() => {
+    if (file) {
+      const originImage = new Image();
+      originImage.src = URL.createObjectURL(file);
+
+      // 이미 DOM에 상단에서 선언한 ref들이 마운트 된 상태이므로,
+      // 각 ref의 current 값은 무조건 존재함.
+      const originImageLayerCurrent = originImageLayerRef.current;
+      const originImageLayerCtx = originImageLayerCurrent!.getContext("2d");
+
+      originImage.onload = () => {
+        originImageLayerCtx!.drawImage(
+          originImage,
+          0,
+          0,
+          originImageLayerCurrent!.width,
+          originImageLayerCurrent!.height
+        );
+      };
+    }
+  }, [file]);
+
+  const mouseDownHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
+    console.log(e.nativeEvent.offsetX);
+    console.log(e.nativeEvent.offsetY);
+  };
 
   return (
     <div className="w-2/3 border h-4/5 rounded-md flex flex-col">
@@ -18,14 +63,25 @@ const NewEditor = () => {
             type="file"
             className="p-3 hidden"
             accept="image/png, image/jpeg, image/jpg"
+            onChange={fileChangeHandler}
           />
           <label htmlFor="fileInput" className="cursor-pointer">
             Select File
           </label>
           <div className="relative w-full h-full flex justify-center items-center">
-            <canvas ref={blurLayerRef} />
-            <canvas ref={originImageLayerRef} />
-            <canvas ref={dragLayerRef} />
+            <canvas
+              className="absolute left-0 top-0 w-full h-full"
+              ref={blurLayerRef}
+            />
+            <canvas
+              className="absolute left-0 top-0 w-full h-full"
+              ref={originImageLayerRef}
+            />
+            <canvas
+              className="absolute left-0 top-0 w-full h-full"
+              ref={dragLayerRef}
+              onMouseDown={mouseDownHandler}
+            />
           </div>
         </div>
       </div>
