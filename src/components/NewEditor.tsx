@@ -8,10 +8,17 @@ import {
 import EditorPanel from "./EditorPanel";
 
 type BlurryArea = {
-  x: 0;
-  y: 0;
-  width: 0;
-  height: 0;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+const INITIAL_BLURRY_AREA = {
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
 };
 
 const NewEditor = () => {
@@ -22,6 +29,9 @@ const NewEditor = () => {
   const [originImageSource, setOriginImageSource] = useState<
     string | undefined
   >();
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [blurryArea, setBlurryArea] = useState<BlurryArea>(INITIAL_BLURRY_AREA);
 
   // file change handler: input(type: file) 태그에서 특정 이미지를 선택했을 경우,
   // 해당 이미지를 file의 source를 상태로 저장.
@@ -56,8 +66,38 @@ const NewEditor = () => {
   }, [originImageSource]);
 
   const mouseDownHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
-    console.log(e.nativeEvent.offsetX);
-    console.log(e.nativeEvent.offsetY);
+    e.preventDefault();
+    e.stopPropagation();
+
+    setIsDragging(true);
+
+    setBlurryArea({
+      ...INITIAL_BLURRY_AREA,
+      x: e.nativeEvent.offsetX,
+      y: e.nativeEvent.offsetY,
+    });
+  };
+
+  const mouseMoveHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isDragging) return;
+
+    setBlurryArea((prevState) => ({
+      ...prevState,
+      width: e.nativeEvent.offsetX - prevState.x,
+      height: e.nativeEvent.offsetY - prevState.y,
+    }));
+  };
+
+  const mouseUpHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setIsDragging(false);
+
+    setBlurryArea(INITIAL_BLURRY_AREA);
   };
 
   return (
@@ -90,6 +130,8 @@ const NewEditor = () => {
               className="absolute left-0 top-0 w-full h-full"
               ref={dragLayerRef}
               onMouseDown={mouseDownHandler}
+              onMouseMove={mouseMoveHandler}
+              onMouseUp={mouseUpHandler}
             />
           </div>
         </div>
