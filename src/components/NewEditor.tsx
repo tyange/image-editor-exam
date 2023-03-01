@@ -139,9 +139,14 @@ const NewEditor = () => {
             Select File
           </label>
         </div>
-        <div className="flex justify-center items-center">
+        <div
+          className="flex justify-center items-center relative"
+          style={{ width: "850px", height: "500px" }}
+        >
+          <canvas className="absolute left-0 top-0" width={850} height={500} />
+          <canvas className="absolute left-0 top-0" width={850} height={500} />
           <canvas
-            className="left-0 top-0"
+            className="absolute left-0 top-0"
             width={850}
             height={500}
             ref={originImageLayerRef}
