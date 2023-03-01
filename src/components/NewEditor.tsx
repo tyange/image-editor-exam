@@ -24,15 +24,15 @@ const NewEditor = () => {
   >();
 
   // file change handler: input(type: file) 태그에서 특정 이미지를 선택했을 경우,
-  // 해당 이미지를 file 상태로 저장.
+  // 해당 이미지를 file의 source를 상태로 저장.
   const fileChangeHandler: ChangeEventHandler<HTMLInputElement> = (e) => {
     if (e.target.files) {
       setOriginImageSource(URL.createObjectURL(e.target.files[0]));
     }
   };
 
-  // 'file' 상태가 변할 때마다 아래 useEffect 함수를 호출하여
-  // 'file' 이미지를 originImageLayer(canvas) 위에 그려냄.
+  // 'originImageSource' 상태가 변할 때마다 아래 useEffect 함수를 호출하여
+  // 'originImageSource' 이미지를 originImageLayer(canvas) 위에 그려냄.
   useEffect(() => {
     if (originImageSource) {
       const originImage = new Image();
