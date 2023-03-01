@@ -22,9 +22,7 @@ const INITIAL_BLURRY_AREA = {
 };
 
 const NewEditor = () => {
-  const blurLayerRef = useRef<HTMLCanvasElement | null>(null);
   const originImageLayerRef = useRef<HTMLCanvasElement | null>(null);
-  const dragLayerRef = useRef<HTMLCanvasElement | null>(null);
 
   const [originImageSource, setOriginImageSource] = useState<
     string | undefined
@@ -100,13 +98,36 @@ const NewEditor = () => {
     setBlurryArea(INITIAL_BLURRY_AREA);
   };
 
+  const drawDragArea = () => {
+    const canvas = originImageLayerRef.current;
+    const context = canvas?.getContext("2d");
+
+    context!.clearRect(0, 0, canvas!.width, canvas!.height);
+
+    context!.fillStyle = "rgba(255,255,255.0.2)";
+
+    const image = new Image();
+    image.src = originImageSource!;
+
+    image.onload = () => {
+      context!.drawImage(image, 0, 0, canvas!.width, canvas!.height);
+
+      context?.fillRect(
+        blurryArea.x,
+        blurryArea.y,
+        blurryArea.width,
+        blurryArea.height
+      );
+    };
+  };
+
+  useEffect(drawDragArea, [blurryArea]);
+
   return (
-    <div className="w-2/3 border h-4/5 rounded-md flex flex-col">
+    <div className="border rounded-md flex flex-col  w-fit h-fit ">
       <EditorPanel />
       <div className="flex-1 flex flex-col justify-center items-center">
-        <div
-          className={`w-full h-full flex flex-col gap-3 justify-center items-center`}
-        >
+        <div>
           <input
             id="fileInput"
             type="file"
@@ -117,23 +138,17 @@ const NewEditor = () => {
           <label htmlFor="fileInput" className="cursor-pointer">
             Select File
           </label>
-          <div className="relative w-full h-full flex justify-center items-center">
-            <canvas
-              className="absolute left-0 top-0 w-full h-full"
-              ref={blurLayerRef}
-            />
-            <canvas
-              className="absolute left-0 top-0 w-full h-full"
-              ref={originImageLayerRef}
-            />
-            <canvas
-              className="absolute left-0 top-0 w-full h-full"
-              ref={dragLayerRef}
-              onMouseDown={mouseDownHandler}
-              onMouseMove={mouseMoveHandler}
-              onMouseUp={mouseUpHandler}
-            />
-          </div>
+        </div>
+        <div className="flex justify-center items-center">
+          <canvas
+            className="left-0 top-0"
+            width={850}
+            height={500}
+            ref={originImageLayerRef}
+            onMouseDown={mouseDownHandler}
+            onMouseMove={mouseMoveHandler}
+            onMouseUp={mouseUpHandler}
+          />
         </div>
       </div>
     </div>
