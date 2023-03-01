@@ -7,27 +7,36 @@ import {
 } from "react";
 import EditorPanel from "./EditorPanel";
 
+type BlurryArea = {
+  x: 0;
+  y: 0;
+  width: 0;
+  height: 0;
+};
+
 const NewEditor = () => {
   const blurLayerRef = useRef<HTMLCanvasElement | null>(null);
   const originImageLayerRef = useRef<HTMLCanvasElement | null>(null);
   const dragLayerRef = useRef<HTMLCanvasElement | null>(null);
 
-  const [file, setFile] = useState<File | undefined>();
+  const [originImageSource, setOriginImageSource] = useState<
+    string | undefined
+  >();
 
   // file change handler: input(type: file) 태그에서 특정 이미지를 선택했을 경우,
   // 해당 이미지를 file 상태로 저장.
   const fileChangeHandler: ChangeEventHandler<HTMLInputElement> = (e) => {
     if (e.target.files) {
-      setFile(e.target.files[0]);
+      setOriginImageSource(URL.createObjectURL(e.target.files[0]));
     }
   };
 
   // 'file' 상태가 변할 때마다 아래 useEffect 함수를 호출하여
   // 'file' 이미지를 originImageLayer(canvas) 위에 그려냄.
   useEffect(() => {
-    if (file) {
+    if (originImageSource) {
       const originImage = new Image();
-      originImage.src = URL.createObjectURL(file);
+      originImage.src = originImageSource;
 
       // 이미 DOM에 상단에서 선언한 ref들이 마운트 된 상태이므로,
       // 각 ref의 current 값은 무조건 존재함.
@@ -44,7 +53,7 @@ const NewEditor = () => {
         );
       };
     }
-  }, [file]);
+  }, [originImageSource]);
 
   const mouseDownHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
     console.log(e.nativeEvent.offsetX);
