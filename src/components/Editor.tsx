@@ -18,8 +18,6 @@ const Editor = () => {
   const [isSelecting, setIsSelecting] = useState(false);
   const [startX, setStartX] = useState(0);
   const [startY, setStartY] = useState(0);
-  const [dptX, setDptX] = useState(0);
-  const [dptY, setDptY] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -95,24 +93,25 @@ const Editor = () => {
   };
 
   const handleMouseDown: MouseEventHandler<HTMLCanvasElement> = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     setIsSelecting(true);
 
-    const currentCanvas = canvasRef.current;
-    const boundary = currentCanvas?.getBoundingClientRect();
-
     const startPoint = {
-      x: e.clientX - boundary!.left,
-      y: e.clientY - boundary!.top,
+      x: e.nativeEvent.offsetX,
+      y: e.nativeEvent.offsetY,
     };
 
-    setStartX(Math.trunc(startPoint.x));
-    setStartY(Math.trunc(startPoint.y));
+    setStartX(startPoint.x);
+    setStartY(startPoint.y);
   };
 
   const handleSelecting: MouseEventHandler<HTMLCanvasElement> = (e) => {
-    if (!isSelecting || !file) return;
+    e.preventDefault();
+    e.stopPropagation();
 
-    console.log("selecting");
+    if (!isSelecting || !file) return;
 
     const canvasCurrent = canvasRef.current;
     const ctx = canvasCurrent?.getContext("2d");
@@ -120,13 +119,45 @@ const Editor = () => {
     const img = new Image();
     img.src = URL.createObjectURL(file);
 
+    const canvasPosition = canvasCurrent!.getBoundingClientRect();
+
+    const dragAreaWidth = Math.round(e.clientX - startX - canvasPosition.left);
+    const dragAreaHeight = Math.round(e.clientY - startY - canvasPosition.top);
+
     img.onload = () => {
       ctx!.filter = "blur(3px)";
-      ctx?.drawImage(img, 0, 0, canvasCurrent!.width, canvasCurrent!.height);
+      ctx!.drawImage(img, 0, 0, canvasCurrent!.width, canvasCurrent!.height);
+
+      let blurredImgData: ImageData | null = null;
+
+      if (dragAreaWidth !== 0 && dragAreaHeight !== 0) {
+        blurredImgData = ctx!.getImageData(
+          startX,
+          startY,
+          dragAreaWidth,
+          dragAreaHeight
+        );
+      }
+
+      ctx!.clearRect(0, 0, canvasCurrent!.width, canvasCurrent!.height);
+      ctx!.filter = "none";
+      ctx!.drawImage(img, 0, 0, canvasCurrent!.width, canvasCurrent!.height);
+
+      const rw = dragAreaWidth < 0 ? startX + dragAreaWidth : startX;
+      const rh = dragAreaHeight < 0 ? startY + dragAreaHeight : startY;
+
+      if (blurredImgData) {
+        ctx!.putImageData(blurredImgData, rw, rh);
+        blurredImgData = null;
+        ctx!.stroke();
+      }
     };
   };
 
   const handleMouseUp: MouseEventHandler<HTMLCanvasElement> = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     setIsSelecting(false);
   };
 
@@ -150,7 +181,7 @@ const Editor = () => {
   }, [file]);
 
   return (
-    <div className="w-2/3 border h-4/5 rounded-md flex flex-col">
+    <div className="w-fit border h-fit rounded-md flex flex-col">
       <EditorPanel />
       <div
         className="flex-1 flex flex-col justify-center items-center"
@@ -172,7 +203,10 @@ const Editor = () => {
           <label htmlFor="fileInput" className="cursor-pointer">
             Select File
           </label>
-          <div className="relative w-full h-full flex justify-center items-center">
+          <div
+            className="relative flex justify-center items-center"
+            style={{ width: "850px", height: "500px" }}
+          >
             {isDragging && (
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
                 <IconFilePlus stroke={2} size={48} />
@@ -180,12 +214,12 @@ const Editor = () => {
             )}
             <canvas
               ref={canvasRef}
+              width={850}
+              height={500}
               onMouseDown={handleMouseDown}
               onMouseMove={handleSelecting}
               onMouseUp={handleMouseUp}
-              className={`w-5/6 h-5/6 shadow-md ${
-                isDragging && "bg-slate-300"
-              }`}
+              className={isDragging ? "bg-slate-300" : ""}
             />
           </div>
         </div>
