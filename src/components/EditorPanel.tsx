@@ -6,10 +6,14 @@ import {
   IconFileDownload,
 } from "@tabler/icons-react";
 
-const EditorPanel = () => {
+type EditorPanelProps = {
+  onUndoHandler: () => void;
+};
+
+const EditorPanel = ({ onUndoHandler }: EditorPanelProps) => {
   return (
     <div className="w-full flex justify-center gap-5 py-5">
-      <button>
+      <button onClick={onUndoHandler}>
         <IconArrowBackUp />
       </button>
       <button>

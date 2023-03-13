@@ -34,6 +34,14 @@ const NewEditor = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [blurryArea, setBlurryArea] = useState<BlurryArea>(INITIAL_BLURRY_AREA);
   const [blurryAreas, setBlurryAreas] = useState<BlurryArea[]>([]);
+  const [showingBlurryAreas, setShowingBlurryAreas] = useState<BlurryArea[]>(
+    []
+  );
+
+  const [blurryAreasHistory, setBlurryAreasHistory] = useState<BlurryArea[][]>(
+    []
+  );
+  const [currentStep, setCurrentStep] = useState(0);
 
   const fileChangeHandler: ChangeEventHandler<HTMLInputElement> = (e) => {
     if (e.target.files) {
@@ -69,6 +77,8 @@ const NewEditor = () => {
     const context = canvas.getContext("2d");
 
     if (blurryArea.width !== 0 && blurryArea.height !== 0) {
+      setCurrentStep((prevState) => prevState + 1);
+
       setBlurryAreas((prevState) => [
         ...prevState,
         {
@@ -136,7 +146,7 @@ const NewEditor = () => {
     image.onload = () => {
       context!.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-      blurryAreas
+      showingBlurryAreas
         .filter(({ blurryImage }) => blurryImage !== undefined)
         .forEach(({ blurryImage, ...area }) => {
           const left = area.width > 0 ? area.x : area.x + area.width;
@@ -148,11 +158,29 @@ const NewEditor = () => {
     };
   };
 
-  useEffect(drawOriginImageLayer, [originImageSource, blurryAreas]);
+  useEffect(drawOriginImageLayer, [originImageSource, showingBlurryAreas]);
+
+  useEffect(() => {
+    const newStep = [...blurryAreas];
+    const updatedStep = [...blurryAreasHistory];
+
+    updatedStep.push(newStep);
+
+    setBlurryAreasHistory(() => [...updatedStep]);
+    setShowingBlurryAreas(() => [...blurryAreas]);
+  }, [blurryAreas]);
+
+  const onUndoHandler = () => {
+    setShowingBlurryAreas(() => [...blurryAreasHistory[currentStep - 1]]);
+
+    setBlurryAreas(() => [...blurryAreasHistory[currentStep - 1]]);
+
+    setCurrentStep((prevState) => prevState - 1);
+  };
 
   return (
     <div className="border rounded-md flex flex-col w-fit h-fit">
-      <EditorPanel />
+      <EditorPanel onUndoHandler={onUndoHandler} />
       <div className="flex-1 flex flex-col justify-center items-center">
         <div>
           <input
