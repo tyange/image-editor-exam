@@ -8,15 +8,16 @@ import {
 
 type EditorPanelProps = {
   onUndoHandler: () => void;
+  onRedoHandler: () => void;
 };
 
-const EditorPanel = ({ onUndoHandler }: EditorPanelProps) => {
+const EditorPanel = ({ onUndoHandler, onRedoHandler }: EditorPanelProps) => {
   return (
     <div className="w-full flex justify-center gap-5 py-5">
       <button onClick={onUndoHandler}>
         <IconArrowBackUp />
       </button>
-      <button>
+      <button onClick={onRedoHandler}>
         <IconArrowForwardUp />
       </button>
       <button>

@@ -146,6 +146,8 @@ const NewEditor = () => {
     image.onload = () => {
       context!.drawImage(image, 0, 0, canvas.width, canvas.height);
 
+      console.log(showingBlurryAreas);
+
       showingBlurryAreas
         .filter(({ blurryImage }) => blurryImage !== undefined)
         .forEach(({ blurryImage, ...area }) => {
@@ -171,6 +173,8 @@ const NewEditor = () => {
   }, [blurryAreas]);
 
   const onUndoHandler = () => {
+    if (currentStep === 0) return;
+
     setShowingBlurryAreas(() => [...blurryAreasHistory[currentStep - 1]]);
 
     setBlurryAreas(() => [...blurryAreasHistory[currentStep - 1]]);
@@ -178,9 +182,22 @@ const NewEditor = () => {
     setCurrentStep((prevState) => prevState - 1);
   };
 
+  const onRedoHandler = () => {
+    if (currentStep >= blurryAreasHistory.length - 1) return;
+
+    setShowingBlurryAreas(() => [...blurryAreasHistory[currentStep + 1]]);
+
+    setBlurryAreas(() => [...blurryAreasHistory[currentStep + 1]]);
+
+    setCurrentStep((prevState) => prevState + 1);
+  };
+
   return (
     <div className="border rounded-md flex flex-col w-fit h-fit">
-      <EditorPanel onUndoHandler={onUndoHandler} />
+      <EditorPanel
+        onUndoHandler={onUndoHandler}
+        onRedoHandler={onRedoHandler}
+      />
       <div className="flex-1 flex flex-col justify-center items-center">
         <div>
           <input
