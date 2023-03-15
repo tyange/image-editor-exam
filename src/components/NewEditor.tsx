@@ -187,8 +187,6 @@ const NewEditor = () => {
 
     setShowingBlurryAreas(() => [...blurryAreasHistory[currentStep + 1]]);
 
-    setBlurryAreas(() => [...blurryAreasHistory[currentStep + 1]]);
-
     setCurrentStep((prevState) => prevState + 1);
   };
 
