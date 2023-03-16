@@ -34,9 +34,6 @@ const NewEditor = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [blurryArea, setBlurryArea] = useState<BlurryArea>(INITIAL_BLURRY_AREA);
   const [blurryAreas, setBlurryAreas] = useState<BlurryArea[]>([]);
-  const [showingBlurryAreas, setShowingBlurryAreas] = useState<BlurryArea[]>(
-    []
-  );
 
   const [blurryAreasHistory, setBlurryAreasHistory] = useState<BlurryArea[][]>(
     []
@@ -146,9 +143,7 @@ const NewEditor = () => {
     image.onload = () => {
       context!.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-      console.log(showingBlurryAreas);
-
-      showingBlurryAreas
+      blurryAreas
         .filter(({ blurryImage }) => blurryImage !== undefined)
         .forEach(({ blurryImage, ...area }) => {
           const left = area.width > 0 ? area.x : area.x + area.width;
@@ -160,7 +155,7 @@ const NewEditor = () => {
     };
   };
 
-  useEffect(drawOriginImageLayer, [originImageSource, showingBlurryAreas]);
+  useEffect(drawOriginImageLayer, [originImageSource, blurryAreas]);
 
   useEffect(() => {
     const newStep = [...blurryAreas];
@@ -169,13 +164,10 @@ const NewEditor = () => {
     updatedStep.push(newStep);
 
     setBlurryAreasHistory(() => [...updatedStep]);
-    setShowingBlurryAreas(() => [...blurryAreas]);
   }, [blurryAreas]);
 
   const onUndoHandler = () => {
     if (currentStep === 0) return;
-
-    setShowingBlurryAreas(() => [...blurryAreasHistory[currentStep - 1]]);
 
     setBlurryAreas(() => [...blurryAreasHistory[currentStep - 1]]);
 
@@ -185,7 +177,7 @@ const NewEditor = () => {
   const onRedoHandler = () => {
     if (currentStep >= blurryAreasHistory.length - 1) return;
 
-    setShowingBlurryAreas(() => [...blurryAreasHistory[currentStep + 1]]);
+    setBlurryAreas(() => [...blurryAreasHistory[currentStep + 1]]);
 
     setCurrentStep((prevState) => prevState + 1);
   };
