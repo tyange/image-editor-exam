@@ -12,7 +12,6 @@ type BlurryArea = {
   y: number;
   width: number;
   height: number;
-  blurryImage?: ImageData;
 };
 
 const INITIAL_BLURRY_AREA = {
@@ -80,12 +79,6 @@ const NewEditor = () => {
         ...prevState,
         {
           ...blurryArea,
-          blurryImage: context?.getImageData(
-            blurryArea.x,
-            blurryArea.y,
-            blurryArea.width,
-            blurryArea.height
-          ),
         },
       ]);
     }
@@ -112,25 +105,6 @@ const NewEditor = () => {
 
   useEffect(drawDragArea, [blurryArea]);
 
-  const drawBlurredImageLayer = () => {
-    const canvas = blurredImageLayerRef.current;
-
-    if (!canvas || !originImageSource) return;
-
-    const context = canvas.getContext("2d");
-
-    const image = new Image();
-    image.src = originImageSource;
-
-    image.onload = () => {
-      context!.filter = "blur(3px)";
-      context!.drawImage(image, 0, 0, canvas!.width, canvas!.height);
-      context!.restore();
-    };
-  };
-
-  useEffect(drawBlurredImageLayer, [originImageSource]);
-
   const drawOriginImageLayer = () => {
     const canvas = originImageLayerRef.current;
 
@@ -143,13 +117,11 @@ const NewEditor = () => {
     image.onload = () => {
       context!.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-      blurryAreas
-        .filter(({ blurryImage }) => blurryImage !== undefined)
-        .forEach(({ blurryImage, ...area }) => {
-          const left = area.width > 0 ? area.x : area.x + area.width;
-          const top = area.height > 0 ? area.y : area.y + area.height;
-          context!.putImageData(blurryImage as ImageData, left, top);
-        });
+      blurryAreas.forEach((area, index) => {
+        context!.fillStyle = "rgba(255,255,255,0.9)";
+        context!.fillText(index.toString(), area.x, area.y);
+        context!.fillRect(area.x, area.y, area.width, area.height);
+      });
 
       context!.restore();
     };
@@ -165,6 +137,14 @@ const NewEditor = () => {
 
     setBlurryAreasHistory(() => [...updatedStep]);
   }, [blurryAreas]);
+
+  useEffect(() => {
+    console.log(blurryAreasHistory);
+  }, [blurryAreasHistory]);
+
+  useEffect(() => {
+    console.log(currentStep);
+  }, [currentStep]);
 
   const onUndoHandler = () => {
     if (currentStep === 0) return;
