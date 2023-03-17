@@ -31,12 +31,12 @@ const NewEditor = () => {
   >();
 
   const [isDragging, setIsDragging] = useState(false);
-  const [blurryArea, setBlurryArea] = useState<BlurryArea>(INITIAL_BLURRY_AREA);
-  const [blurryAreas, setBlurryAreas] = useState<BlurryArea[]>([]);
+  const [maskedArea, setMaskedArea] = useState<BlurryArea>(INITIAL_BLURRY_AREA);
+  const [maskedAreas, setMaskedAreas] = useState<BlurryArea[]>([]);
 
-  const [blurryAreasHistory, setBlurryAreasHistory] = useState<BlurryArea[][]>(
-    []
-  );
+  const [maskedAreasHistory, setMaskedAreasHistory] = useState<BlurryArea[][]>([
+    [],
+  ]);
   const [currentStep, setCurrentStep] = useState(0);
 
   const fileChangeHandler: ChangeEventHandler<HTMLInputElement> = (e) => {
@@ -48,7 +48,7 @@ const NewEditor = () => {
   const mouseDownHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
     setIsDragging(true);
 
-    setBlurryArea({
+    setMaskedArea({
       ...INITIAL_BLURRY_AREA,
       x: e.nativeEvent.offsetX,
       y: e.nativeEvent.offsetY,
@@ -58,7 +58,7 @@ const NewEditor = () => {
   const mouseMoveHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
     if (!isDragging) return;
 
-    setBlurryArea((prevState) => ({
+    setMaskedArea((prevState) => ({
       ...prevState,
       width: e.nativeEvent.offsetX - prevState.x,
       height: e.nativeEvent.offsetY - prevState.y,
@@ -70,22 +70,31 @@ const NewEditor = () => {
 
     if (!canvas) return;
 
-    const context = canvas.getContext("2d");
+    if (maskedArea.width !== 0 && maskedArea.height !== 0) {
+      if (maskedAreasHistory.length > 0) {
+        setCurrentStep(maskedAreasHistory.length + 1);
+      } else {
+        setCurrentStep((prevState) => prevState + 1);
+      }
 
-    if (blurryArea.width !== 0 && blurryArea.height !== 0) {
-      setCurrentStep((prevState) => prevState + 1);
-
-      setBlurryAreas((prevState) => [
+      setMaskedAreas((prevState) => [
         ...prevState,
         {
-          ...blurryArea,
+          ...maskedArea,
         },
       ]);
+
+      const newStep = [...maskedAreas, maskedArea];
+      const updatedStep = [...maskedAreasHistory];
+
+      updatedStep.push(newStep);
+
+      setMaskedAreasHistory(() => [...updatedStep]);
     }
 
     setIsDragging(false);
 
-    setBlurryArea(INITIAL_BLURRY_AREA);
+    setMaskedArea(INITIAL_BLURRY_AREA);
   };
 
   const drawDragArea = () => {
@@ -96,14 +105,14 @@ const NewEditor = () => {
     context!.fillStyle = "rgba(255,255,255,0.2)";
 
     context?.fillRect(
-      blurryArea.x,
-      blurryArea.y,
-      blurryArea.width,
-      blurryArea.height
+      maskedArea.x,
+      maskedArea.y,
+      maskedArea.width,
+      maskedArea.height
     );
   };
 
-  useEffect(drawDragArea, [blurryArea]);
+  useEffect(drawDragArea, [maskedArea]);
 
   const drawOriginImageLayer = () => {
     const canvas = originImageLayerRef.current;
@@ -117,7 +126,7 @@ const NewEditor = () => {
     image.onload = () => {
       context!.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-      blurryAreas.forEach((area, index) => {
+      maskedAreas.forEach((area, index) => {
         context!.fillStyle = "rgba(255,255,255,0.9)";
         context!.fillText(index.toString(), area.x, area.y);
         context!.fillRect(area.x, area.y, area.width, area.height);
@@ -127,37 +136,28 @@ const NewEditor = () => {
     };
   };
 
-  useEffect(drawOriginImageLayer, [originImageSource, blurryAreas]);
-
-  useEffect(() => {
-    const newStep = [...blurryAreas];
-    const updatedStep = [...blurryAreasHistory];
-
-    updatedStep.push(newStep);
-
-    setBlurryAreasHistory(() => [...updatedStep]);
-  }, [blurryAreas]);
-
-  useEffect(() => {
-    console.log(blurryAreasHistory);
-  }, [blurryAreasHistory]);
-
-  useEffect(() => {
-    console.log(currentStep);
-  }, [currentStep]);
+  useEffect(drawOriginImageLayer, [originImageSource, maskedAreas]);
 
   const onUndoHandler = () => {
-    if (currentStep === 0) return;
+    if (currentStep <= 0) return;
 
-    setBlurryAreas(() => [...blurryAreasHistory[currentStep - 1]]);
+    if (currentStep === maskedAreasHistory.length) {
+      setMaskedAreas(() => [...maskedAreasHistory[currentStep - 2]]);
+      setCurrentStep((prevState) => prevState - 2);
+      return;
+    }
+
+    setMaskedAreas(() => [...maskedAreasHistory[currentStep - 1]]);
 
     setCurrentStep((prevState) => prevState - 1);
   };
 
   const onRedoHandler = () => {
-    if (currentStep >= blurryAreasHistory.length - 1) return;
+    if (currentStep >= maskedAreasHistory.length - 1) {
+      return;
+    }
 
-    setBlurryAreas(() => [...blurryAreasHistory[currentStep + 1]]);
+    setMaskedAreas(() => [...maskedAreasHistory[currentStep + 1]]);
 
     setCurrentStep((prevState) => prevState + 1);
   };
