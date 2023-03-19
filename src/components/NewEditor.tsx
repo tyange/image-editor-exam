@@ -27,18 +27,23 @@ type NewEditorState = {
   maskedAreas: MaskedArea[];
   maskedAreasHistory: MaskedArea[][];
   currentStep: number;
+  isOverwrite: boolean;
 };
 
 type NewEditorAction =
   | { type: "undo" | "redo" | "maskedAreaInit" | "historyUpdate" }
   | { type: "setOriginImageSource"; payload: string }
-  | { type: "masked"; payload: MaskedArea };
+  | {
+      type: "masked";
+      payload: MaskedArea;
+    };
 
 const initialState: NewEditorState = {
   originImageSource: undefined,
   maskedAreas: [],
-  maskedAreasHistory: [],
+  maskedAreasHistory: [[]],
   currentStep: 0,
+  isOverwrite: false,
 };
 const reducer = (state: NewEditorState, action: NewEditorAction) => {
   switch (action.type) {
@@ -51,7 +56,9 @@ const reducer = (state: NewEditorState, action: NewEditorAction) => {
       return {
         ...state,
         maskedAreas: [...state.maskedAreas, action.payload],
-        currentStep: state.currentStep + 1,
+        currentStep: state.isOverwrite
+          ? state.maskedAreasHistory.length
+          : state.currentStep + 1,
       };
     case "historyUpdate":
       return {
@@ -70,13 +77,19 @@ const reducer = (state: NewEditorState, action: NewEditorAction) => {
       return {
         ...state,
         maskedAreas: state.maskedAreasHistory[state.currentStep - 1],
+        maskedAreasHistory: [
+          ...state.maskedAreasHistory,
+          state.maskedAreasHistory[state.currentStep - 1],
+        ],
         currentStep: state.currentStep - 1,
+        isOverwrite: true,
       };
     case "redo":
       return {
         ...state,
         maskedAreas: state.maskedAreasHistory[state.currentStep + 1],
         currentStep: state.currentStep + 1,
+        isOverwrite: true,
       };
     default:
       return state;
@@ -154,7 +167,7 @@ const NewEditor = () => {
     );
   };
 
-  useEffect(drawDragArea, [state]);
+  useEffect(drawDragArea, [maskedArea]);
 
   const drawOriginImageLayer = () => {
     const canvas = originImageLayerRef.current;
