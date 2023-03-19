@@ -2,46 +2,103 @@ import {
   ChangeEventHandler,
   MouseEventHandler,
   useEffect,
+  useReducer,
   useRef,
   useState,
 } from "react";
 import EditorPanel from "./EditorPanel";
 
-type BlurryArea = {
+type MaskedArea = {
   x: number;
   y: number;
   width: number;
   height: number;
 };
 
-const INITIAL_BLURRY_AREA = {
+const INITIAL_MASKED_AREA = {
   x: 0,
   y: 0,
   width: 0,
   height: 0,
 };
 
+type NewEditorState = {
+  originImageSource: string | undefined;
+  maskedAreas: MaskedArea[];
+  maskedAreasHistory: MaskedArea[][];
+  currentStep: number;
+};
+
+type NewEditorAction =
+  | { type: "undo" | "redo" | "maskedAreaInit" | "historyUpdate" }
+  | { type: "setOriginImageSource"; payload: string }
+  | { type: "masked"; payload: MaskedArea };
+
+const initialState: NewEditorState = {
+  originImageSource: undefined,
+  maskedAreas: [],
+  maskedAreasHistory: [],
+  currentStep: 0,
+};
+const reducer = (state: NewEditorState, action: NewEditorAction) => {
+  switch (action.type) {
+    case "setOriginImageSource":
+      return {
+        ...initialState,
+        originImageSource: action.payload,
+      };
+    case "masked":
+      return {
+        ...state,
+        maskedAreas: [...state.maskedAreas, action.payload],
+        currentStep: state.currentStep + 1,
+      };
+    case "historyUpdate":
+      return {
+        ...state,
+        maskedAreasHistory: [
+          ...state.maskedAreasHistory,
+          [...state.maskedAreas],
+        ],
+      };
+    case "maskedAreaInit":
+      return {
+        ...state,
+        maskedArea: INITIAL_MASKED_AREA,
+      };
+    case "undo":
+      return {
+        ...state,
+        maskedAreas: state.maskedAreasHistory[state.currentStep - 1],
+        currentStep: state.currentStep - 1,
+      };
+    case "redo":
+      return {
+        ...state,
+        maskedAreas: state.maskedAreasHistory[state.currentStep + 1],
+        currentStep: state.currentStep + 1,
+      };
+    default:
+      return state;
+  }
+};
+
 const NewEditor = () => {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [maskedArea, setMaskedArea] = useState<MaskedArea>(INITIAL_MASKED_AREA);
+
   const originImageLayerRef = useRef<HTMLCanvasElement | null>(null);
   const blurredImageLayerRef = useRef<HTMLCanvasElement | null>(null);
   const dragLayerRef = useRef<HTMLCanvasElement | null>(null);
 
-  const [originImageSource, setOriginImageSource] = useState<
-    string | undefined
-  >();
-
-  const [isDragging, setIsDragging] = useState(false);
-  const [maskedArea, setMaskedArea] = useState<BlurryArea>(INITIAL_BLURRY_AREA);
-  const [maskedAreas, setMaskedAreas] = useState<BlurryArea[]>([]);
-
-  const [maskedAreasHistory, setMaskedAreasHistory] = useState<BlurryArea[][]>([
-    [],
-  ]);
-  const [currentStep, setCurrentStep] = useState(0);
-
   const fileChangeHandler: ChangeEventHandler<HTMLInputElement> = (e) => {
     if (e.target.files) {
-      setOriginImageSource(URL.createObjectURL(e.target.files[0]));
+      dispatch({
+        type: "setOriginImageSource",
+        payload: URL.createObjectURL(e.target.files[0]),
+      });
     }
   };
 
@@ -49,7 +106,7 @@ const NewEditor = () => {
     setIsDragging(true);
 
     setMaskedArea({
-      ...INITIAL_BLURRY_AREA,
+      ...INITIAL_MASKED_AREA,
       x: e.nativeEvent.offsetX,
       y: e.nativeEvent.offsetY,
     });
@@ -66,35 +123,20 @@ const NewEditor = () => {
   };
 
   const mouseUpHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
+    e.preventDefault();
+
     const canvas = blurredImageLayerRef.current;
 
     if (!canvas) return;
 
     if (maskedArea.width !== 0 && maskedArea.height !== 0) {
-      if (maskedAreasHistory.length > 0) {
-        setCurrentStep(maskedAreasHistory.length + 1);
-      } else {
-        setCurrentStep((prevState) => prevState + 1);
-      }
-
-      setMaskedAreas((prevState) => [
-        ...prevState,
-        {
-          ...maskedArea,
-        },
-      ]);
-
-      const newStep = [...maskedAreas, maskedArea];
-      const updatedStep = [...maskedAreasHistory];
-
-      updatedStep.push(newStep);
-
-      setMaskedAreasHistory(() => [...updatedStep]);
+      dispatch({ type: "masked", payload: maskedArea });
+      dispatch({ type: "historyUpdate" });
     }
 
     setIsDragging(false);
 
-    setMaskedArea(INITIAL_BLURRY_AREA);
+    dispatch({ type: "maskedAreaInit" });
   };
 
   const drawDragArea = () => {
@@ -112,21 +154,21 @@ const NewEditor = () => {
     );
   };
 
-  useEffect(drawDragArea, [maskedArea]);
+  useEffect(drawDragArea, [state]);
 
   const drawOriginImageLayer = () => {
     const canvas = originImageLayerRef.current;
 
-    if (!canvas || !originImageSource) return;
+    if (!canvas || !state.originImageSource) return;
 
     const context = canvas.getContext("2d");
     const image = new Image();
-    image.src = originImageSource;
+    image.src = state.originImageSource;
 
     image.onload = () => {
       context!.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-      maskedAreas.forEach((area, index) => {
+      state.maskedAreas.forEach((area, index) => {
         context!.fillStyle = "rgba(255,255,255,0.9)";
         context!.fillText(index.toString(), area.x, area.y);
         context!.fillRect(area.x, area.y, area.width, area.height);
@@ -136,30 +178,20 @@ const NewEditor = () => {
     };
   };
 
-  useEffect(drawOriginImageLayer, [originImageSource, maskedAreas]);
+  useEffect(drawOriginImageLayer, [state]);
 
   const onUndoHandler = () => {
-    if (currentStep <= 0) return;
+    if (state.currentStep <= 0) return;
 
-    if (currentStep === maskedAreasHistory.length) {
-      setMaskedAreas(() => [...maskedAreasHistory[currentStep - 2]]);
-      setCurrentStep((prevState) => prevState - 2);
-      return;
-    }
-
-    setMaskedAreas(() => [...maskedAreasHistory[currentStep - 1]]);
-
-    setCurrentStep((prevState) => prevState - 1);
+    dispatch({ type: "undo" });
   };
 
   const onRedoHandler = () => {
-    if (currentStep >= maskedAreasHistory.length - 1) {
+    if (state.currentStep >= state.maskedAreasHistory.length - 1) {
       return;
     }
 
-    setMaskedAreas(() => [...maskedAreasHistory[currentStep + 1]]);
-
-    setCurrentStep((prevState) => prevState + 1);
+    dispatch({ type: "redo" });
   };
 
   return (
@@ -214,5 +246,4 @@ const NewEditor = () => {
     </div>
   );
 };
-
 export default NewEditor;
