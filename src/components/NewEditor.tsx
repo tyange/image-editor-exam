@@ -31,7 +31,7 @@ type NewEditorState = {
 };
 
 type NewEditorAction =
-  | { type: "undo" | "redo" | "maskedAreaInit" | "historyUpdate" }
+  | { type: "undo" | "redo" | "historyUpdate" }
   | { type: "setOriginImageSource"; payload: string }
   | {
       type: "masked";
@@ -67,11 +67,6 @@ const reducer = (state: NewEditorState, action: NewEditorAction) => {
           ...state.maskedAreasHistory,
           [...state.maskedAreas],
         ],
-      };
-    case "maskedAreaInit":
-      return {
-        ...state,
-        maskedArea: INITIAL_MASKED_AREA,
       };
     case "undo":
       return {
@@ -149,7 +144,7 @@ const NewEditor = () => {
 
     setIsDragging(false);
 
-    dispatch({ type: "maskedAreaInit" });
+    setMaskedArea(() => INITIAL_MASKED_AREA);
   };
 
   const drawDragArea = () => {
@@ -191,7 +186,7 @@ const NewEditor = () => {
     };
   };
 
-  useEffect(drawOriginImageLayer, [state]);
+  useEffect(drawOriginImageLayer, [state.originImageSource, state.maskedAreas]);
 
   const onUndoHandler = () => {
     if (state.currentStep <= 0) return;
