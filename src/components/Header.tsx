@@ -4,7 +4,8 @@ const Header = () => {
       <nav className="flex justify-center">
         <div className="text-center">
           <p className="text-xl mb-5 font-bold">IMG EDITOR</p>
-          <span>개인 정보를 가려보세요</span>
+          <p>마우스로 이미지 위를 드래그 해서</p>
+          <p>특정 부분을 가릴 수 있습니다</p>
         </div>
       </nav>
     </header>
