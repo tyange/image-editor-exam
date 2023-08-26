@@ -89,6 +89,7 @@ const Editor = () => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [maskedArea, setMaskedArea] = useState<MaskedArea>(INITIAL_MASKED_AREA);
+  const [fileName, setFileName] = useState("");
 
   const originImageLayerRef = useRef<HTMLCanvasElement | null>(null);
   const blurredImageLayerRef = useRef<HTMLCanvasElement | null>(null);
@@ -96,6 +97,7 @@ const Editor = () => {
 
   const fileChangeHandler: ChangeEventHandler<HTMLInputElement> = (e) => {
     if (e.target.files) {
+      setFileName(e.target.files[0].name);
       dispatch({
         type: "setOriginImageSource",
         payload: URL.createObjectURL(e.target.files[0]),
@@ -202,9 +204,26 @@ const Editor = () => {
     dispatch({ type: "undo" });
   };
 
+  const onDownloadHandler = () => {
+    const canvas = originImageLayerRef.current;
+
+    if (!canvas) return;
+
+    const dataURL = canvas.toDataURL("image/png");
+
+    const link = document.createElement("a");
+    link.href = dataURL;
+    link.download = `${fileName}_edited.png`;
+
+    link.click();
+  };
+
   return (
     <div className="border rounded-md flex flex-col w-fit h-fit">
-      <EditorPanel onUndoHandler={onUndoHandler} />
+      <EditorPanel
+        onUndoHandler={onUndoHandler}
+        onDownloadHandler={onDownloadHandler}
+      />
       <div className="flex-1 flex flex-col justify-center items-center">
         <div>
           <input
