@@ -1,231 +1,254 @@
 import {
-  useState,
-  DragEventHandler,
   ChangeEventHandler,
-  useEffect,
-  useRef,
   MouseEventHandler,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
 } from "react";
 import EditorPanel from "./EditorPanel";
 
-import { IconFilePlus } from "@tabler/icons-react";
+type MaskedArea = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+const INITIAL_MASKED_AREA = {
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+};
+
+type EditorState = {
+  originImageSource: string | undefined;
+  maskedAreas: MaskedArea[];
+  maskedAreasHistory: MaskedArea[][];
+  currentStep: number;
+  isOverwrite: boolean;
+};
+
+type EditorAction =
+  | { type: "undo" | "redo" | "historyUpdate" }
+  | { type: "setOriginImageSource"; payload: string }
+  | {
+      type: "masked";
+      payload: MaskedArea;
+    };
+
+const initialState: EditorState = {
+  originImageSource: undefined,
+  maskedAreas: [],
+  maskedAreasHistory: [[]],
+  currentStep: 0,
+  isOverwrite: false,
+};
+const reducer = (state: EditorState, action: EditorAction) => {
+  switch (action.type) {
+    case "setOriginImageSource":
+      return {
+        ...initialState,
+        originImageSource: action.payload,
+      };
+    case "masked":
+      return {
+        ...state,
+        maskedAreas: [...state.maskedAreas, action.payload],
+        currentStep: state.isOverwrite
+          ? state.maskedAreasHistory.length
+          : state.currentStep + 1,
+      };
+    case "historyUpdate":
+      return {
+        ...state,
+        maskedAreasHistory: [
+          ...state.maskedAreasHistory,
+          [...state.maskedAreas],
+        ],
+      };
+    case "undo":
+      return {
+        ...state,
+        maskedAreas: state.maskedAreasHistory[state.currentStep - 1],
+        maskedAreasHistory: [
+          ...state.maskedAreasHistory,
+          state.maskedAreasHistory[state.currentStep - 1],
+        ],
+        currentStep: state.currentStep - 1,
+        isOverwrite: true,
+      };
+    default:
+      return state;
+  }
+};
 
 const Editor = () => {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
   const [isDragging, setIsDragging] = useState(false);
-  const [stopUpload, setStopUpload] = useState(false);
-  const [file, setFile] = useState<File | undefined>(undefined);
+  const [maskedArea, setMaskedArea] = useState<MaskedArea>(INITIAL_MASKED_AREA);
 
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [startY, setStartY] = useState(0);
+  const originImageLayerRef = useRef<HTMLCanvasElement | null>(null);
+  const blurredImageLayerRef = useRef<HTMLCanvasElement | null>(null);
+  const dragLayerRef = useRef<HTMLCanvasElement | null>(null);
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  const handleDragEnter: DragEventHandler = (e): void => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDragLeave: DragEventHandler = (e): void => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    setIsDragging(false);
-  };
-
-  const handleDragOver: DragEventHandler = (e): void => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (e.dataTransfer!.files) {
-      setIsDragging(true);
-    }
-  };
-
-  const handleDrop: DragEventHandler = (e): void => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (stopUpload) {
-      preventNewImgUpload(e.dataTransfer.files[0]);
-      return;
-    }
-
-    if (
-      e.dataTransfer.files[0].type !== "image/png" &&
-      e.dataTransfer.files[0].type !== "image/jpg" &&
-      e.dataTransfer.files[0].type !== "image/jpeg"
-    ) {
-      alert("파일 형식이 올바르지 않습니다");
-      setIsDragging(false);
-      return;
-    }
-
-    setFile(e.dataTransfer.files[0]);
-    setIsDragging(false);
-  };
-
-  const handleFileChange = (e: any) => {
-    if (stopUpload) {
-      preventNewImgUpload(e.target.files[0]);
-      return;
-    }
-
+  const fileChangeHandler: ChangeEventHandler<HTMLInputElement> = (e) => {
     if (e.target.files) {
-      setFile(e.target.files[0]);
+      dispatch({
+        type: "setOriginImageSource",
+        payload: URL.createObjectURL(e.target.files[0]),
+      });
     }
   };
 
-  const preventNewImgUpload = (file: File) => {
-    if (
-      confirm("이미 이미지가 업로드되어 있습니다. 이미지를 교체하시겠습니까?")
-    ) {
-      const currentCanvas = canvasRef.current;
+  const mouseDownHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
+    setIsDragging(true);
 
-      const ctx = currentCanvas?.getContext("2d");
-
-      ctx?.clearRect(0, 0, currentCanvas!.width, currentCanvas!.height);
-
-      setFile(file);
-    }
-
-    return;
-  };
-
-  const handleMouseDown: MouseEventHandler<HTMLCanvasElement> = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    setIsSelecting(true);
-
-    const startPoint = {
+    setMaskedArea({
+      ...INITIAL_MASKED_AREA,
       x: e.nativeEvent.offsetX,
       y: e.nativeEvent.offsetY,
-    };
-
-    setStartX(startPoint.x);
-    setStartY(startPoint.y);
+    });
   };
 
-  const handleSelecting: MouseEventHandler<HTMLCanvasElement> = (e) => {
+  const mouseMoveHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
+    if (!isDragging) return;
+
+    setMaskedArea((prevState) => ({
+      ...prevState,
+      width: e.nativeEvent.offsetX - prevState.x,
+      height: e.nativeEvent.offsetY - prevState.y,
+    }));
+  };
+
+  const mouseUpHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
     e.preventDefault();
-    e.stopPropagation();
 
-    if (!isSelecting || !file) return;
+    const canvas = blurredImageLayerRef.current;
 
-    const canvasCurrent = canvasRef.current;
-    const ctx = canvasCurrent?.getContext("2d");
+    if (!canvas) return;
 
-    const img = new Image();
-    img.src = URL.createObjectURL(file);
-
-    const canvasPosition = canvasCurrent!.getBoundingClientRect();
-
-    const dragAreaWidth = Math.round(e.clientX - startX - canvasPosition.left);
-    const dragAreaHeight = Math.round(e.clientY - startY - canvasPosition.top);
-
-    img.onload = () => {
-      ctx!.filter = "blur(3px)";
-      ctx!.drawImage(img, 0, 0, canvasCurrent!.width, canvasCurrent!.height);
-
-      let blurredImgData: ImageData | null = null;
-
-      if (dragAreaWidth !== 0 && dragAreaHeight !== 0) {
-        blurredImgData = ctx!.getImageData(
-          startX,
-          startY,
-          dragAreaWidth,
-          dragAreaHeight
-        );
-      }
-
-      ctx!.clearRect(0, 0, canvasCurrent!.width, canvasCurrent!.height);
-      ctx!.filter = "none";
-      ctx!.drawImage(img, 0, 0, canvasCurrent!.width, canvasCurrent!.height);
-
-      const rw = dragAreaWidth < 0 ? startX + dragAreaWidth : startX;
-      const rh = dragAreaHeight < 0 ? startY + dragAreaHeight : startY;
-
-      if (blurredImgData) {
-        ctx!.putImageData(blurredImgData, rw, rh);
-        blurredImgData = null;
-        ctx!.stroke();
-      }
-    };
-  };
-
-  const handleMouseUp: MouseEventHandler<HTMLCanvasElement> = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    setIsSelecting(false);
-  };
-
-  const drawingImgOnCanvas = (imgFile: File) => {
-    const canvasCurrent = canvasRef.current;
-    const ctx = canvasCurrent?.getContext("2d");
-
-    const img = new Image();
-    img.src = URL.createObjectURL(imgFile);
-
-    img.onload = () => {
-      ctx?.drawImage(img, 0, 0, canvasCurrent!.width, canvasCurrent!.height);
-      setStopUpload(true);
-    };
-  };
-
-  useEffect(() => {
-    if (file) {
-      drawingImgOnCanvas(file);
+    if (maskedArea.width !== 0 && maskedArea.height !== 0) {
+      dispatch({ type: "masked", payload: maskedArea });
+      dispatch({ type: "historyUpdate" });
     }
-  }, [file]);
+
+    setIsDragging(false);
+
+    setMaskedArea(() => INITIAL_MASKED_AREA);
+  };
+
+  const drawDragArea = () => {
+    const canvas = dragLayerRef.current;
+    const context = canvas!.getContext("2d");
+
+    context!.clearRect(0, 0, canvas!.width, canvas!.height);
+    context!.fillStyle = "rgba(255,255,255,0.2)";
+
+    context?.fillRect(
+      maskedArea.x,
+      maskedArea.y,
+      maskedArea.width,
+      maskedArea.height
+    );
+  };
+
+  useEffect(drawDragArea, [maskedArea]);
+
+  const drawOriginImageLayer = () => {
+    const canvas = originImageLayerRef.current;
+
+    if (!canvas || !state.originImageSource) return;
+
+    const context = canvas.getContext("2d");
+    const image = new Image();
+    image.src = state.originImageSource;
+
+    image.onload = () => {
+      const hRatio = canvas.width / image.width;
+      const vRatio = canvas.height / image.height;
+      const ratio = Math.min(hRatio, vRatio);
+      const centerShiftX = (canvas.width - image.width * ratio) / 2;
+      const centerShiftY = (canvas.height - image.height * ratio) / 2;
+
+      context!.drawImage(
+        image,
+        0,
+        0,
+        image.width,
+        image.height,
+        centerShiftX,
+        centerShiftY,
+        image.width * ratio,
+        image.height * ratio
+      );
+
+      state.maskedAreas.forEach((area, index) => {
+        context!.fillStyle = "rgba(255,255,255,1)";
+        context!.fillRect(area.x, area.y, area.width, area.height);
+      });
+
+      context!.restore();
+    };
+  };
+
+  useEffect(drawOriginImageLayer, [state.originImageSource, state.maskedAreas]);
+
+  const onUndoHandler = () => {
+    if (state.currentStep <= 0) return;
+
+    dispatch({ type: "undo" });
+  };
 
   return (
-    <div className="w-fit border h-fit rounded-md flex flex-col">
-      <EditorPanel />
-      <div
-        className="flex-1 flex flex-col justify-center items-center"
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-      >
-        <div
-          className={`w-full h-full flex flex-col gap-3 justify-center items-center`}
-        >
+    <div className="border rounded-md flex flex-col w-fit h-fit">
+      <EditorPanel onUndoHandler={onUndoHandler} />
+      <div className="flex-1 flex flex-col justify-center items-center">
+        <div>
           <input
             id="fileInput"
             type="file"
             className="p-3 hidden"
-            onChange={handleFileChange}
             accept="image/png, image/jpeg, image/jpg"
+            onChange={fileChangeHandler}
           />
           <label htmlFor="fileInput" className="cursor-pointer">
             Select File
           </label>
-          <div
-            className="relative flex justify-center items-center"
-            style={{ width: "850px", height: "500px" }}
-          >
-            {isDragging && (
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                <IconFilePlus stroke={2} size={48} />
-              </div>
-            )}
-            <canvas
-              ref={canvasRef}
-              width={850}
-              height={500}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleSelecting}
-              onMouseUp={handleMouseUp}
-              className={isDragging ? "bg-slate-300" : ""}
-            />
-          </div>
+        </div>
+        <div
+          className="flex justify-center items-center relative"
+          style={{ width: "850px", height: "500px" }}
+        >
+          <canvas
+            id="origin-image-layer"
+            className="absolute left-0 top-0 z-10"
+            ref={originImageLayerRef}
+            width={850}
+            height={500}
+          />
+          <canvas
+            id="blurred-image-layer"
+            className="absolute left-0 top-0"
+            ref={blurredImageLayerRef}
+            width={850}
+            height={500}
+          />
+          <canvas
+            id="drag-layer"
+            className="absolute left-0 top-0 z-20"
+            width={850}
+            height={500}
+            ref={dragLayerRef}
+            onMouseDown={mouseDownHandler}
+            onMouseMove={mouseMoveHandler}
+            onMouseUp={mouseUpHandler}
+          />
         </div>
       </div>
     </div>
   );
 };
-
 export default Editor;
