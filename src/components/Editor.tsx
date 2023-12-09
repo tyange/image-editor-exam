@@ -25,9 +25,8 @@ const INITIAL_MASKED_AREA = {
 type EditorState = {
   originImageSource: string | undefined;
   maskedAreas: MaskedArea[];
-  maskedAreasHistory: MaskedArea[][];
+  beforeMaskedAreasHistory: MaskedArea[][];
   currentStep: number;
-  isOverwrite: boolean;
 };
 
 type EditorAction =
@@ -41,11 +40,10 @@ type EditorAction =
 const initialState: EditorState = {
   originImageSource: undefined,
   maskedAreas: [],
-  maskedAreasHistory: [[]],
+  beforeMaskedAreasHistory: [],
   currentStep: 0,
-  isOverwrite: false,
 };
-const reducer = (state: EditorState, action: EditorAction) => {
+const reducer = (state: EditorState, action: EditorAction): EditorState => {
   switch (action.type) {
     case "setOriginImageSource":
       return {
@@ -56,28 +54,35 @@ const reducer = (state: EditorState, action: EditorAction) => {
       return {
         ...state,
         maskedAreas: [...state.maskedAreas, action.payload],
-        currentStep: state.isOverwrite
-          ? state.maskedAreasHistory.length
-          : state.currentStep + 1,
+        currentStep: state.currentStep + 1,
+        beforeMaskedAreasHistory: [],
       };
-    case "historyUpdate":
+    case "undo":
+      const newMaskedAreas = [...state.maskedAreas];
+      newMaskedAreas.pop();
+
       return {
         ...state,
-        maskedAreasHistory: [
-          ...state.maskedAreasHistory,
+        maskedAreas: [...newMaskedAreas],
+        currentStep: state.currentStep - 1,
+        beforeMaskedAreasHistory: [
+          ...state.beforeMaskedAreasHistory,
           [...state.maskedAreas],
         ],
       };
-    case "undo":
+    case "redo":
+      const newBeforeMaskedAreasHistory = [...state.beforeMaskedAreasHistory];
+      newBeforeMaskedAreasHistory.pop();
+
       return {
         ...state,
-        maskedAreas: state.maskedAreasHistory[state.currentStep - 1],
-        maskedAreasHistory: [
-          ...state.maskedAreasHistory,
-          state.maskedAreasHistory[state.currentStep - 1],
+        currentStep: state.currentStep + 1,
+        maskedAreas: [
+          ...state.beforeMaskedAreasHistory[
+            state.beforeMaskedAreasHistory.length - 1
+          ],
         ],
-        currentStep: state.currentStep - 1,
-        isOverwrite: true,
+        beforeMaskedAreasHistory: [...newBeforeMaskedAreasHistory],
       };
     default:
       return state;
@@ -134,7 +139,6 @@ const Editor = () => {
 
     if (maskedArea.width !== 0 && maskedArea.height !== 0) {
       dispatch({ type: "masked", payload: maskedArea });
-      dispatch({ type: "historyUpdate" });
     }
 
     setIsDragging(false);
@@ -204,6 +208,12 @@ const Editor = () => {
     dispatch({ type: "undo" });
   };
 
+  const onRedoHandler = () => {
+    if (state.beforeMaskedAreasHistory.length === 0) return;
+
+    dispatch({ type: "redo" });
+  };
+
   const onDownloadHandler = () => {
     const canvas = originImageLayerRef.current;
 
@@ -222,6 +232,7 @@ const Editor = () => {
     <div className="border rounded-md flex flex-col w-fit h-fit">
       <EditorPanel
         onUndoHandler={onUndoHandler}
+        onRedoHandler={onRedoHandler}
         onDownloadHandler={onDownloadHandler}
       />
       <div className="flex-1 flex flex-col justify-center items-center">
