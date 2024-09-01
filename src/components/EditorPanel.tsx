@@ -8,12 +8,16 @@ type EditorPanelProps = {
   onUndoHandler: () => void;
   onRedoHandler: () => void;
   onDownloadHandler: () => void;
+  onZoomInHandler: () => void;
+  onZoomOutHandler: () => void;
 };
 
 const EditorPanel = ({
   onUndoHandler,
   onRedoHandler,
   onDownloadHandler,
+  onZoomInHandler,
+  onZoomOutHandler,
 }: EditorPanelProps) => {
   return (
     <div className="w-full flex justify-center gap-5 py-5">
@@ -25,6 +29,12 @@ const EditorPanel = ({
       </button>
       <button onClick={onDownloadHandler}>
         <IconFileDownload />
+      </button>
+      <button onClick={onZoomInHandler}>
+        <span>+</span>
+      </button>
+      <button onClick={onZoomOutHandler}>
+        <span>-</span>
       </button>
     </div>
   );

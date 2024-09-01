@@ -27,10 +27,11 @@ type EditorState = {
   maskedAreas: MaskedArea[];
   beforeMaskedAreasHistory: MaskedArea[][];
   currentStep: number;
+  zoomLevel: number;
 };
 
 type EditorAction =
-  | { type: "undo" | "redo" | "historyUpdate" }
+  | { type: "undo" | "redo" | "historyUpdate" | "zoomIn" | "zoomOut" }
   | { type: "setOriginImageSource"; payload: string }
   | {
       type: "masked";
@@ -42,6 +43,7 @@ const initialState: EditorState = {
   maskedAreas: [],
   beforeMaskedAreasHistory: [],
   currentStep: 0,
+  zoomLevel: 1,
 };
 const reducer = (state: EditorState, action: EditorAction): EditorState => {
   switch (action.type) {
@@ -83,6 +85,16 @@ const reducer = (state: EditorState, action: EditorAction): EditorState => {
           ],
         ],
         beforeMaskedAreasHistory: [...newBeforeMaskedAreasHistory],
+      };
+    case "zoomIn":
+      return {
+        ...state,
+        zoomLevel: state.zoomLevel + 1,
+      };
+    case "zoomOut":
+      return {
+        ...state,
+        zoomLevel: state.zoomLevel - 1,
       };
     default:
       return state;
@@ -164,6 +176,8 @@ const Editor = () => {
   useEffect(drawDragArea, [maskedArea]);
 
   const drawOriginImageLayer = () => {
+    console.log(state.zoomLevel);
+
     const canvas = originImageLayerRef.current;
 
     if (!canvas || !state.originImageSource) return;
@@ -200,7 +214,11 @@ const Editor = () => {
     };
   };
 
-  useEffect(drawOriginImageLayer, [state.originImageSource, state.maskedAreas]);
+  useEffect(drawOriginImageLayer, [
+    state.originImageSource,
+    state.maskedAreas,
+    state.zoomLevel,
+  ]);
 
   const onUndoHandler = () => {
     if (state.currentStep <= 0) return;
@@ -212,6 +230,14 @@ const Editor = () => {
     if (state.beforeMaskedAreasHistory.length === 0) return;
 
     dispatch({ type: "redo" });
+  };
+
+  const onZoomInHandler = () => {
+    dispatch({ type: "zoomIn" });
+  };
+
+  const onZoomOutHandler = () => {
+    dispatch({ type: "zoomOut" });
   };
 
   const onDownloadHandler = () => {
@@ -234,6 +260,8 @@ const Editor = () => {
         onUndoHandler={onUndoHandler}
         onRedoHandler={onRedoHandler}
         onDownloadHandler={onDownloadHandler}
+        onZoomInHandler={onZoomInHandler}
+        onZoomOutHandler={onZoomOutHandler}
       />
       <div className="flex-1 flex flex-col justify-center items-center">
         <div>
