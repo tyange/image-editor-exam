@@ -189,23 +189,26 @@ const Editor = () => {
     image.onload = () => {
       const hRatio = canvas.width / image.width;
       const vRatio = canvas.height / image.height;
-      const ratio = Math.min(hRatio, vRatio);
+      const ratio = Math.min(hRatio, vRatio) * state.zoomLevel;
       const centerShiftX = (canvas.width - image.width * ratio) / 2;
       const centerShiftY = (canvas.height - image.height * ratio) / 2;
 
+      context!.clearRect(0, 0, canvas.width, canvas.height);
+      context!.save();
+
       context!.drawImage(
         image,
-        0,
-        0,
-        image.width,
-        image.height,
+        // 0,
+        // 0,
+        // image.width,
+        // image.height,
         centerShiftX,
         centerShiftY,
         image.width * ratio,
         image.height * ratio
       );
 
-      state.maskedAreas.forEach((area, index) => {
+      state.maskedAreas.forEach((area) => {
         context!.fillStyle = "rgba(255,255,255,1)";
         context!.fillRect(area.x, area.y, area.width, area.height);
       });
@@ -237,6 +240,10 @@ const Editor = () => {
   };
 
   const onZoomOutHandler = () => {
+    if (state.zoomLevel === 1) {
+      return;
+    }
+
     dispatch({ type: "zoomOut" });
   };
 
