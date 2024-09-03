@@ -13,6 +13,7 @@ type MaskedArea = {
   y: number;
   width: number;
   height: number;
+  ratio: number;
 };
 
 const INITIAL_MASKED_AREA = {
@@ -20,6 +21,7 @@ const INITIAL_MASKED_AREA = {
   y: 0,
   width: 0,
   height: 0,
+  ratio: 1,
 };
 
 type EditorState = {
@@ -31,12 +33,13 @@ type EditorState = {
 };
 
 type EditorAction =
-  | { type: "undo" | "redo" | "historyUpdate" | "zoomIn" | "zoomOut" }
+  | { type: "undo" | "redo" | "historyUpdate" }
   | { type: "setOriginImageSource"; payload: string }
   | {
       type: "masked";
       payload: MaskedArea;
-    };
+    }
+  | { type: "setZoomLevel"; payload: number };
 
 const initialState: EditorState = {
   originImageSource: undefined,
@@ -86,15 +89,10 @@ const reducer = (state: EditorState, action: EditorAction): EditorState => {
         ],
         beforeMaskedAreasHistory: [...newBeforeMaskedAreasHistory],
       };
-    case "zoomIn":
+    case "setZoomLevel":
       return {
         ...state,
-        zoomLevel: state.zoomLevel + 1,
-      };
-    case "zoomOut":
-      return {
-        ...state,
-        zoomLevel: state.zoomLevel - 1,
+        zoomLevel: action.payload,
       };
     default:
       return state;
@@ -145,12 +143,11 @@ const Editor = () => {
   const mouseUpHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
     e.preventDefault();
 
-    const canvas = blurredImageLayerRef.current;
-
-    if (!canvas) return;
-
     if (maskedArea.width !== 0 && maskedArea.height !== 0) {
-      dispatch({ type: "masked", payload: maskedArea });
+      dispatch({
+        type: "masked",
+        payload: { ...maskedArea },
+      });
     }
 
     setIsDragging(false);
@@ -176,52 +173,62 @@ const Editor = () => {
   useEffect(drawDragArea, [maskedArea]);
 
   const drawOriginImageLayer = () => {
-    console.log(state.zoomLevel);
-
     const canvas = originImageLayerRef.current;
 
-    if (!canvas || !state.originImageSource) return;
+    if (!canvas || !state.originImageSource) {
+      return;
+    }
 
     const context = canvas.getContext("2d");
     const image = new Image();
     image.src = state.originImageSource;
 
     image.onload = () => {
-      const hRatio = canvas.width / image.width;
-      const vRatio = canvas.height / image.height;
-      const ratio = Math.min(hRatio, vRatio) * state.zoomLevel;
-      const centerShiftX = (canvas.width - image.width * ratio) / 2;
-      const centerShiftY = (canvas.height - image.height * ratio) / 2;
+      const verticalRatio = canvas.width / image.width;
+
+      const centerShiftX = (canvas.width - image.width * verticalRatio) / 2;
+      const centerShiftY = (canvas.height - image.height * verticalRatio) / 2;
 
       context!.clearRect(0, 0, canvas.width, canvas.height);
-      context!.save();
 
       context!.drawImage(
         image,
-        // 0,
-        // 0,
-        // image.width,
-        // image.height,
+        0,
+        0,
+        image.width,
+        image.height,
         centerShiftX,
         centerShiftY,
-        image.width * ratio,
-        image.height * ratio
+        image.width * verticalRatio,
+        image.height * verticalRatio
       );
-
-      state.maskedAreas.forEach((area) => {
-        context!.fillStyle = "rgba(255,255,255,1)";
-        context!.fillRect(area.x, area.y, area.width, area.height);
-      });
-
-      context!.restore();
     };
+
+    console.log(state.zoomLevel);
+
+    context!.scale(state.zoomLevel, state.zoomLevel);
   };
 
-  useEffect(drawOriginImageLayer, [
-    state.originImageSource,
-    state.maskedAreas,
-    state.zoomLevel,
-  ]);
+  useEffect(drawOriginImageLayer, [state.originImageSource, state.zoomLevel]);
+
+  const drawMaskedAreas = () => {
+    const canvas = blurredImageLayerRef.current;
+
+    if (!canvas || state.maskedAreas.length === 0 || !state.originImageSource) {
+      return;
+    }
+
+    const context = canvas.getContext("2d");
+
+    context!.clearRect(0, 0, canvas.width, canvas.height);
+
+    state.maskedAreas.forEach((area) => {
+      context!.fillStyle = "rgba(255,255,255,1)";
+      context!.fillRect(area.x, area.y, area.width, area.height);
+    });
+  };
+
+  useEffect(drawMaskedAreas, [state.maskedAreas]);
 
   const onUndoHandler = () => {
     if (state.currentStep <= 0) return;
@@ -236,7 +243,7 @@ const Editor = () => {
   };
 
   const onZoomInHandler = () => {
-    dispatch({ type: "zoomIn" });
+    dispatch({ type: "setZoomLevel", payload: (state.zoomLevel + 1) * 1.1 });
   };
 
   const onZoomOutHandler = () => {
@@ -244,7 +251,7 @@ const Editor = () => {
       return;
     }
 
-    dispatch({ type: "zoomOut" });
+    dispatch({ type: "setZoomLevel", payload: (state.zoomLevel - 1) / 1.1 });
   };
 
   const onDownloadHandler = () => {
@@ -296,14 +303,14 @@ const Editor = () => {
           />
           <canvas
             id="blurred-image-layer"
-            className="absolute left-0 top-0"
+            className="absolute left-0 top-0 z-20"
             ref={blurredImageLayerRef}
             width={850}
             height={500}
           />
           <canvas
             id="drag-layer"
-            className="absolute left-0 top-0 z-20"
+            className="absolute left-0 top-0 z-30"
             width={850}
             height={500}
             ref={dragLayerRef}
