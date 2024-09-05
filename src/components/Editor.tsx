@@ -114,7 +114,7 @@ const Editor = () => {
   const [fileName, setFileName] = useState("");
 
   const originImageLayerRef = useRef<HTMLCanvasElement | null>(null);
-  const blurredImageLayerRef = useRef<HTMLCanvasElement | null>(null);
+  const maskedLayerRef = useRef<HTMLCanvasElement | null>(null);
   const dragLayerRef = useRef<HTMLCanvasElement | null>(null);
 
   const fileChangeHandler: ChangeEventHandler<HTMLInputElement> = (e) => {
@@ -128,7 +128,7 @@ const Editor = () => {
   };
 
   const getCanvasCoordinates = (event: MouseEvent) => {
-    const canvas = blurredImageLayerRef.current;
+    const canvas = maskedLayerRef.current;
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
@@ -230,7 +230,7 @@ const Editor = () => {
   useEffect(drawOriginImageLayer, [state.originImageSource, state.zoomLevel]);
 
   const drawMaskedAreas = () => {
-    const canvas = blurredImageLayerRef.current;
+    const canvas = maskedLayerRef.current;
 
     if (!canvas || state.maskedAreas.length === 0 || !state.originImageSource) {
       return;
@@ -250,6 +250,24 @@ const Editor = () => {
     context!.restore();
   };
   useEffect(drawMaskedAreas, [state.maskedAreas, state.zoomLevel]);
+
+  const mergeCanvases = (canvases: HTMLCanvasElement[]) => {
+    const mergedCanvas = document.createElement("canvas");
+    const mergedContext = mergedCanvas.getContext("2d");
+
+    if (!mergedContext) {
+      return;
+    }
+
+    mergedCanvas.width = canvases[0].width;
+    mergedCanvas.height = canvases[0].height;
+
+    canvases.forEach((canvas) => {
+      mergedContext.drawImage(canvas, 0, 0);
+    });
+
+    return mergedCanvas;
+  };
 
   const onUndoHandler = () => {
     if (state.currentStep <= 0) return;
@@ -272,9 +290,16 @@ const Editor = () => {
   };
 
   const onDownloadHandler = () => {
-    const canvas = originImageLayerRef.current;
+    const originCanvas = originImageLayerRef.current;
+    const maskedCanvas = maskedLayerRef.current;
 
-    const dataURL = canvas!.toDataURL("image/png");
+    if (!originCanvas || !maskedCanvas) {
+      return;
+    }
+
+    const mergedCanvas = mergeCanvases([originCanvas, maskedCanvas]);
+
+    const dataURL = mergedCanvas!.toDataURL("image/png");
 
     const link = document.createElement("a");
     link.href = dataURL;
@@ -319,7 +344,7 @@ const Editor = () => {
           <canvas
             id="blurred-image-layer"
             className="absolute left-0 top-0 z-20"
-            ref={blurredImageLayerRef}
+            ref={maskedLayerRef}
             width={850}
             height={500}
           />
