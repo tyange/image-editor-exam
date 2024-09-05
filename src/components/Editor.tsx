@@ -14,7 +14,6 @@ type MaskedArea = {
   y: number;
   width: number;
   height: number;
-  ratio: number;
 };
 
 const INITIAL_MASKED_AREA = {
@@ -22,7 +21,6 @@ const INITIAL_MASKED_AREA = {
   y: 0,
   width: 0,
   height: 0,
-  ratio: 1,
 };
 
 type EditorState = {
@@ -34,13 +32,12 @@ type EditorState = {
 };
 
 type EditorAction =
-  | { type: "undo" | "redo" | "historyUpdate" }
+  | { type: "undo" | "redo" | "historyUpdate" | "zoomIn" | "zoomOut" }
   | { type: "setOriginImageSource"; payload: string }
   | {
       type: "masked";
       payload: MaskedArea;
-    }
-  | { type: "setZoomLevel"; payload: number };
+    };
 
 const initialState: EditorState = {
   originImageSource: undefined,
@@ -90,10 +87,19 @@ const reducer = (state: EditorState, action: EditorAction): EditorState => {
         ],
         beforeMaskedAreasHistory: [...newBeforeMaskedAreasHistory],
       };
-    case "setZoomLevel":
+    case "zoomIn":
+      const zoomInLevel = state.zoomLevel + 0.1;
+
       return {
         ...state,
-        zoomLevel: action.payload,
+        zoomLevel: zoomInLevel > 0.1 ? zoomInLevel : 0.1,
+      };
+    case "zoomOut":
+      const zoomOutLevel = state.zoomLevel - 0.1;
+
+      return {
+        ...state,
+        zoomLevel: zoomOutLevel > 0.1 ? zoomOutLevel : 0.1,
       };
     default:
       return state;
@@ -103,8 +109,6 @@ const reducer = (state: EditorState, action: EditorAction): EditorState => {
 const Editor = () => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const [zoom, setZoom] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [maskedArea, setMaskedArea] = useState<MaskedArea>(INITIAL_MASKED_AREA);
   const [fileName, setFileName] = useState("");
@@ -132,8 +136,8 @@ const Editor = () => {
     const scaleY = canvas.height / rect.height;
 
     return {
-      x: ((event.clientX - rect.left) * scaleX) / zoom + offset.x,
-      y: ((event.clientY - rect.top) * scaleY) / zoom + offset.y,
+      x: ((event.clientX - rect.left) * scaleX) / state.zoomLevel,
+      y: ((event.clientY - rect.top) * scaleY) / state.zoomLevel,
     };
   };
 
@@ -189,8 +193,7 @@ const Editor = () => {
       return;
     }
 
-    context!.translate(-offset.x, -offset.y);
-    context!.scale(zoom, zoom);
+    context!.scale(state.zoomLevel, state.zoomLevel);
     context!.fillStyle = "rgba(255,255,255,0.2)";
 
     context?.fillRect(
@@ -219,13 +222,12 @@ const Editor = () => {
 
     image.onload = () => {
       context!.save();
-      context!.scale(zoom, zoom);
-      context!.translate(-offset.x, -offset.y);
+      context!.scale(state.zoomLevel, state.zoomLevel);
       context!.drawImage(image, 0, 0);
       context!.restore();
     };
   };
-  useEffect(drawOriginImageLayer, [state.originImageSource, zoom]);
+  useEffect(drawOriginImageLayer, [state.originImageSource, state.zoomLevel]);
 
   const drawMaskedAreas = () => {
     const canvas = blurredImageLayerRef.current;
@@ -238,8 +240,7 @@ const Editor = () => {
 
     context!.clearRect(0, 0, canvas.width, canvas.height);
     context!.save();
-    context!.translate(-offset.x, -offset.y);
-    context!.scale(zoom, zoom);
+    context!.scale(state.zoomLevel, state.zoomLevel);
 
     state.maskedAreas.forEach((area) => {
       context!.fillStyle = "rgba(255,255,255,1)";
@@ -248,7 +249,7 @@ const Editor = () => {
 
     context!.restore();
   };
-  useEffect(drawMaskedAreas, [state.maskedAreas, zoom]);
+  useEffect(drawMaskedAreas, [state.maskedAreas, state.zoomLevel]);
 
   const onUndoHandler = () => {
     if (state.currentStep <= 0) return;
@@ -263,17 +264,11 @@ const Editor = () => {
   };
 
   const onZoomInHandler = () => {
-    setZoom((prevZoom) => {
-      const newZoom = prevZoom + 0.1;
-      return newZoom > 0.1 ? newZoom : 0.1;
-    });
+    dispatch({ type: "zoomIn" });
   };
 
   const onZoomOutHandler = () => {
-    setZoom((prevZoom) => {
-      const newZoom = prevZoom + -0.1;
-      return newZoom > 0.1 ? newZoom : 0.1;
-    });
+    dispatch({ type: "zoomOut" });
   };
 
   const onDownloadHandler = () => {
