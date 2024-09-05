@@ -1,5 +1,6 @@
 import {
   ChangeEventHandler,
+  MouseEvent,
   MouseEventHandler,
   useEffect,
   useReducer,
@@ -102,6 +103,8 @@ const reducer = (state: EditorState, action: EditorAction): EditorState => {
 const Editor = () => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [maskedArea, setMaskedArea] = useState<MaskedArea>(INITIAL_MASKED_AREA);
   const [fileName, setFileName] = useState("");
@@ -120,23 +123,43 @@ const Editor = () => {
     }
   };
 
+  const getCanvasCoordinates = (event: MouseEvent) => {
+    const canvas = blurredImageLayerRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    return {
+      x: ((event.clientX - rect.left) * scaleX) / zoom + offset.x,
+      y: ((event.clientY - rect.top) * scaleY) / zoom + offset.y,
+    };
+  };
+
   const mouseDownHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
     setIsDragging(true);
 
+    const { x, y } = getCanvasCoordinates(e);
+
     setMaskedArea({
       ...INITIAL_MASKED_AREA,
-      x: e.nativeEvent.offsetX,
-      y: e.nativeEvent.offsetY,
+      x,
+      y,
     });
   };
 
   const mouseMoveHandler: MouseEventHandler<HTMLCanvasElement> = (e) => {
     if (!isDragging) return;
 
+    const { x, y } = getCanvasCoordinates(e);
+    const width = x - maskedArea.x;
+    const height = y - maskedArea.y;
+
     setMaskedArea((prevState) => ({
       ...prevState,
-      width: e.nativeEvent.offsetX - prevState.x,
-      height: e.nativeEvent.offsetY - prevState.y,
+      width,
+      height,
     }));
   };
 
@@ -160,6 +183,14 @@ const Editor = () => {
     const context = canvas!.getContext("2d");
 
     context!.clearRect(0, 0, canvas!.width, canvas!.height);
+    context!.save();
+
+    if (maskedArea.width === 0 || maskedArea.height === 0) {
+      return;
+    }
+
+    context!.translate(-offset.x, -offset.y);
+    context!.scale(zoom, zoom);
     context!.fillStyle = "rgba(255,255,255,0.2)";
 
     context?.fillRect(
@@ -168,8 +199,9 @@ const Editor = () => {
       maskedArea.width,
       maskedArea.height
     );
-  };
 
+    context!.restore();
+  };
   useEffect(drawDragArea, [maskedArea]);
 
   const drawOriginImageLayer = () => {
@@ -183,33 +215,17 @@ const Editor = () => {
     const image = new Image();
     image.src = state.originImageSource;
 
+    context!.clearRect(0, 0, canvas.width, canvas.height);
+
     image.onload = () => {
-      const verticalRatio = canvas.width / image.width;
-
-      const centerShiftX = (canvas.width - image.width * verticalRatio) / 2;
-      const centerShiftY = (canvas.height - image.height * verticalRatio) / 2;
-
-      context!.clearRect(0, 0, canvas.width, canvas.height);
-
-      context!.drawImage(
-        image,
-        0,
-        0,
-        image.width,
-        image.height,
-        centerShiftX,
-        centerShiftY,
-        image.width * verticalRatio,
-        image.height * verticalRatio
-      );
+      context!.save();
+      context!.scale(zoom, zoom);
+      context!.translate(-offset.x, -offset.y);
+      context!.drawImage(image, 0, 0);
+      context!.restore();
     };
-
-    console.log(state.zoomLevel);
-
-    context!.scale(state.zoomLevel, state.zoomLevel);
   };
-
-  useEffect(drawOriginImageLayer, [state.originImageSource, state.zoomLevel]);
+  useEffect(drawOriginImageLayer, [state.originImageSource, zoom]);
 
   const drawMaskedAreas = () => {
     const canvas = blurredImageLayerRef.current;
@@ -221,14 +237,18 @@ const Editor = () => {
     const context = canvas.getContext("2d");
 
     context!.clearRect(0, 0, canvas.width, canvas.height);
+    context!.save();
+    context!.translate(-offset.x, -offset.y);
+    context!.scale(zoom, zoom);
 
     state.maskedAreas.forEach((area) => {
       context!.fillStyle = "rgba(255,255,255,1)";
       context!.fillRect(area.x, area.y, area.width, area.height);
     });
-  };
 
-  useEffect(drawMaskedAreas, [state.maskedAreas]);
+    context!.restore();
+  };
+  useEffect(drawMaskedAreas, [state.maskedAreas, zoom]);
 
   const onUndoHandler = () => {
     if (state.currentStep <= 0) return;
@@ -243,23 +263,23 @@ const Editor = () => {
   };
 
   const onZoomInHandler = () => {
-    dispatch({ type: "setZoomLevel", payload: (state.zoomLevel + 1) * 1.1 });
+    setZoom((prevZoom) => {
+      const newZoom = prevZoom + 0.1;
+      return newZoom > 0.1 ? newZoom : 0.1;
+    });
   };
 
   const onZoomOutHandler = () => {
-    if (state.zoomLevel === 1) {
-      return;
-    }
-
-    dispatch({ type: "setZoomLevel", payload: (state.zoomLevel - 1) / 1.1 });
+    setZoom((prevZoom) => {
+      const newZoom = prevZoom + -0.1;
+      return newZoom > 0.1 ? newZoom : 0.1;
+    });
   };
 
   const onDownloadHandler = () => {
     const canvas = originImageLayerRef.current;
 
-    if (!canvas) return;
-
-    const dataURL = canvas.toDataURL("image/png");
+    const dataURL = canvas!.toDataURL("image/png");
 
     const link = document.createElement("a");
     link.href = dataURL;
