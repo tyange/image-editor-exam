@@ -110,6 +110,8 @@ const Editor = () => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   const [isDragging, setIsDragging] = useState(false);
+  const [imageWidth, setImageWidth] = useState(0);
+  const [imageHeight, setImageHeight] = useState(0);
   const [maskedArea, setMaskedArea] = useState<MaskedArea>(INITIAL_MASKED_AREA);
   const [fileName, setFileName] = useState("");
 
@@ -208,7 +210,7 @@ const Editor = () => {
     context!.scale(state.zoomLevel, state.zoomLevel);
     context!.translate(-centerX, -centerY);
 
-    context!.fillStyle = "rgba(0,0,0,0.2)";
+    context!.fillStyle = "rgba(255,0,0,0.2)";
 
     context?.fillRect(
       maskedArea.x,
@@ -222,28 +224,54 @@ const Editor = () => {
   useEffect(drawDragArea, [maskedArea]);
 
   const drawOriginImageLayer = () => {
-    const canvas = originImageLayerRef.current;
+    const originImageLayerCanvas = originImageLayerRef.current;
+    const drawMaskedLayerCanvas = maskedLayerRef.current;
+    const dragLayerCanvas = dragLayerRef.current;
 
-    if (!canvas || !state.originImageSource) {
+    if (
+      !originImageLayerCanvas ||
+      !drawMaskedLayerCanvas ||
+      !dragLayerCanvas ||
+      !state.originImageSource
+    ) {
       return;
     }
 
-    const context = canvas.getContext("2d");
+    const originImageLayerContext = originImageLayerCanvas.getContext("2d");
     const image = new Image();
     image.src = state.originImageSource;
 
-    context!.clearRect(0, 0, canvas.width, canvas.height);
-
     image.onload = () => {
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
+      originImageLayerCanvas.width = image.width * state.zoomLevel;
+      originImageLayerCanvas.height = image.height * state.zoomLevel;
+      drawMaskedLayerCanvas.width = image.width * state.zoomLevel;
+      drawMaskedLayerCanvas.height = image.height * state.zoomLevel;
+      dragLayerCanvas.width = image.width * state.zoomLevel;
+      dragLayerCanvas.height = image.height * state.zoomLevel;
 
-      context!.save();
-      context!.translate(centerX, centerY);
-      context!.scale(state.zoomLevel, state.zoomLevel);
-      context!.translate(-image.width / 2, -image.height / 2);
-      context!.drawImage(image, 0, 0, image.width, image.height);
-      context!.restore();
+      const centerX = originImageLayerCanvas.width / 2;
+      const centerY = originImageLayerCanvas.height / 2;
+
+      originImageLayerContext!.clearRect(
+        0,
+        0,
+        originImageLayerCanvas.width,
+        originImageLayerCanvas.height
+      );
+
+      originImageLayerContext!.save();
+      originImageLayerContext!.translate(centerX, centerY);
+      originImageLayerContext!.scale(state.zoomLevel, state.zoomLevel);
+      originImageLayerContext!.translate(-image.width / 2, -image.height / 2);
+      originImageLayerContext!.drawImage(
+        image,
+        0,
+        0,
+        image.width,
+        image.height
+      );
+      originImageLayerContext!.restore();
+      drawMaskedAreas();
     };
   };
   useEffect(drawOriginImageLayer, [state.originImageSource, state.zoomLevel]);
@@ -264,14 +292,15 @@ const Editor = () => {
     context!.translate(centerX, centerY);
     context!.scale(state.zoomLevel, state.zoomLevel);
     context!.translate(-centerX, -centerY);
+
     state.maskedAreas.forEach((area) => {
-      context!.fillStyle = "rgba(0,0,0,1)";
+      context!.fillStyle = "rgba(255,0,0,1)";
       context!.fillRect(area.x, area.y, area.width, area.height);
     });
 
     context!.restore();
   };
-  useEffect(drawMaskedAreas, [state.maskedAreas, state.zoomLevel]);
+  useEffect(drawMaskedAreas, [state.maskedAreas]);
 
   const mergeCanvases = (canvases: HTMLCanvasElement[]) => {
     const mergedCanvas = document.createElement("canvas");
@@ -331,7 +360,7 @@ const Editor = () => {
   };
 
   return (
-    <div className="border rounded-md flex flex-col w-fit h-fit">
+    <div className="border rounded-md flex flex-col w-fit h-fit bg-slate-600">
       <EditorPanel
         onUndoHandler={onUndoHandler}
         onRedoHandler={onRedoHandler}
@@ -353,28 +382,22 @@ const Editor = () => {
           </label>
         </div>
         <div
-          className="flex justify-center items-center relative"
-          style={{ width: "850px", height: "500px" }}
+          className="flex justify-center items-center relative overflow-auto"
+          style={{ width: "700px", height: "500px" }}
         >
           <canvas
             id="origin-image-layer"
-            className="absolute left-0 top-0 z-10"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
             ref={originImageLayerRef}
-            width={850}
-            height={500}
           />
           <canvas
             id="blurred-image-layer"
-            className="absolute left-0 top-0 z-20"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20"
             ref={maskedLayerRef}
-            width={850}
-            height={500}
           />
           <canvas
             id="drag-layer"
-            className="absolute left-0 top-0 z-30"
-            width={850}
-            height={500}
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30"
             ref={dragLayerRef}
             onMouseDown={mouseDownHandler}
             onMouseMove={mouseMoveHandler}
