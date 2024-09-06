@@ -14,6 +14,7 @@ type MaskedArea = {
   y: number;
   width: number;
   height: number;
+  zoomLevel: number;
 };
 
 const INITIAL_MASKED_AREA = {
@@ -21,6 +22,7 @@ const INITIAL_MASKED_AREA = {
   y: 0,
   width: 0,
   height: 0,
+  zoomLevel: 1,
 };
 
 type EditorState = {
@@ -181,7 +183,7 @@ const Editor = () => {
     if (maskedArea.width !== 0 && maskedArea.height !== 0) {
       dispatch({
         type: "masked",
-        payload: { ...maskedArea },
+        payload: { ...maskedArea, zoomLevel: state.zoomLevel },
       });
     }
 
@@ -289,9 +291,9 @@ const Editor = () => {
 
     context!.clearRect(0, 0, canvas.width, canvas.height);
     context!.save();
-    context!.translate(centerX, centerY);
+    // context!.translate(centerX, centerY);
     context!.scale(state.zoomLevel, state.zoomLevel);
-    context!.translate(-centerX, -centerY);
+    // context!.translate(-centerX, -centerY);
 
     state.maskedAreas.forEach((area) => {
       context!.fillStyle = "rgba(255,0,0,1)";
@@ -300,7 +302,32 @@ const Editor = () => {
 
     context!.restore();
   };
-  useEffect(drawMaskedAreas, [state.maskedAreas]);
+
+  const drawMaskedAreas1 = () => {
+    const canvas = maskedLayerRef.current;
+
+    if (!canvas || state.maskedAreas.length === 0 || !state.originImageSource) {
+      return;
+    }
+
+    const context = canvas.getContext("2d");
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    context!.clearRect(0, 0, canvas.width, canvas.height);
+    context!.save();
+    // context!.translate(centerX, centerY);
+    // context!.scale(state.zoomLevel, state.zoomLevel);
+    // context!.translate(-centerX, -centerY);
+
+    state.maskedAreas.forEach((area) => {
+      context!.fillStyle = "rgba(255,0,0,1)";
+      context!.fillRect(area.x, area.y, area.width, area.height);
+    });
+
+    context!.restore();
+  };
+  useEffect(drawMaskedAreas1, [state.maskedAreas]);
 
   const mergeCanvases = (canvases: HTMLCanvasElement[]) => {
     const mergedCanvas = document.createElement("canvas");
