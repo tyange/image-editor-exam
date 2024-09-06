@@ -132,12 +132,18 @@ const Editor = () => {
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
 
+    const canvasX = event.clientX - rect.left;
+    const canvasY = event.clientY - rect.top;
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    const zoomedX = (canvasX - centerX) / state.zoomLevel + centerX;
+    const zoomedY = (canvasY - centerY) / state.zoomLevel + centerY;
     return {
-      x: ((event.clientX - rect.left) * scaleX) / state.zoomLevel,
-      y: ((event.clientY - rect.top) * scaleY) / state.zoomLevel,
+      x: zoomedX,
+      y: zoomedY,
     };
   };
 
@@ -148,8 +154,8 @@ const Editor = () => {
 
     setMaskedArea({
       ...INITIAL_MASKED_AREA,
-      x,
-      y,
+      x: x,
+      y: y,
     });
   };
 
@@ -189,12 +195,20 @@ const Editor = () => {
     context!.clearRect(0, 0, canvas!.width, canvas!.height);
     context!.save();
 
-    if (maskedArea.width === 0 || maskedArea.height === 0) {
+    if (!canvas || maskedArea.width === 0 || maskedArea.height === 0) {
       return;
     }
 
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    context!.clearRect(0, 0, canvas.width, canvas.height);
+    context!.save();
+    context!.translate(centerX, centerY);
     context!.scale(state.zoomLevel, state.zoomLevel);
-    context!.fillStyle = "rgba(255,255,255,0.2)";
+    context!.translate(-centerX, -centerY);
+
+    context!.fillStyle = "rgba(0,0,0,0.2)";
 
     context?.fillRect(
       maskedArea.x,
@@ -221,9 +235,14 @@ const Editor = () => {
     context!.clearRect(0, 0, canvas.width, canvas.height);
 
     image.onload = () => {
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
       context!.save();
+      context!.translate(centerX, centerY);
       context!.scale(state.zoomLevel, state.zoomLevel);
-      context!.drawImage(image, 0, 0);
+      context!.translate(-image.width / 2, -image.height / 2);
+      context!.drawImage(image, 0, 0, image.width, image.height);
       context!.restore();
     };
   };
@@ -237,13 +256,16 @@ const Editor = () => {
     }
 
     const context = canvas.getContext("2d");
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
 
     context!.clearRect(0, 0, canvas.width, canvas.height);
     context!.save();
+    context!.translate(centerX, centerY);
     context!.scale(state.zoomLevel, state.zoomLevel);
-
+    context!.translate(-centerX, -centerY);
     state.maskedAreas.forEach((area) => {
-      context!.fillStyle = "rgba(255,255,255,1)";
+      context!.fillStyle = "rgba(0,0,0,1)";
       context!.fillRect(area.x, area.y, area.width, area.height);
     });
 
