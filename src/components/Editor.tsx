@@ -118,8 +118,6 @@ const Editor = () => {
   const [fileName, setFileName] = useState("");
 
   const originImageLayerRef = useRef<HTMLCanvasElement | null>(null);
-  const maskedLayerRef = useRef<HTMLCanvasElement | null>(null);
-  const dragLayerRef = useRef<HTMLCanvasElement | null>(null);
 
   const fileChangeHandler: ChangeEventHandler<HTMLInputElement> = (e) => {
     if (e.target.files) {
@@ -132,7 +130,7 @@ const Editor = () => {
   };
 
   const getCanvasCoordinates = (event: MouseEvent) => {
-    const canvas = maskedLayerRef.current;
+    const canvas = originImageLayerRef.current;
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
@@ -193,7 +191,7 @@ const Editor = () => {
   };
 
   const drawDragArea = () => {
-    const canvas = dragLayerRef.current;
+    const canvas = originImageLayerRef.current;
     const context = canvas!.getContext("2d");
 
     context!.clearRect(0, 0, canvas!.width, canvas!.height);
@@ -227,15 +225,8 @@ const Editor = () => {
 
   const drawOriginImageLayer = () => {
     const originImageLayerCanvas = originImageLayerRef.current;
-    const drawMaskedLayerCanvas = maskedLayerRef.current;
-    const dragLayerCanvas = dragLayerRef.current;
 
-    if (
-      !originImageLayerCanvas ||
-      !drawMaskedLayerCanvas ||
-      !dragLayerCanvas ||
-      !state.originImageSource
-    ) {
+    if (!originImageLayerCanvas || !state.originImageSource) {
       return;
     }
 
@@ -246,10 +237,6 @@ const Editor = () => {
     image.onload = () => {
       originImageLayerCanvas.width = image.width * state.zoomLevel;
       originImageLayerCanvas.height = image.height * state.zoomLevel;
-      drawMaskedLayerCanvas.width = image.width * state.zoomLevel;
-      drawMaskedLayerCanvas.height = image.height * state.zoomLevel;
-      dragLayerCanvas.width = image.width * state.zoomLevel;
-      dragLayerCanvas.height = image.height * state.zoomLevel;
 
       const centerX = originImageLayerCanvas.width / 2;
       const centerY = originImageLayerCanvas.height / 2;
@@ -279,7 +266,7 @@ const Editor = () => {
   useEffect(drawOriginImageLayer, [state.originImageSource, state.zoomLevel]);
 
   const drawMaskedAreas = () => {
-    const canvas = maskedLayerRef.current;
+    const canvas = originImageLayerRef.current;
 
     if (!canvas || state.maskedAreas.length === 0 || !state.originImageSource) {
       return;
@@ -304,7 +291,7 @@ const Editor = () => {
   };
 
   const drawMaskedAreas1 = () => {
-    const canvas = maskedLayerRef.current;
+    const canvas = originImageLayerRef.current;
 
     if (!canvas || state.maskedAreas.length === 0 || !state.originImageSource) {
       return;
@@ -369,15 +356,12 @@ const Editor = () => {
 
   const onDownloadHandler = () => {
     const originCanvas = originImageLayerRef.current;
-    const maskedCanvas = maskedLayerRef.current;
 
-    if (!originCanvas || !maskedCanvas) {
+    if (!originCanvas) {
       return;
     }
 
-    const mergedCanvas = mergeCanvases([originCanvas, maskedCanvas]);
-
-    const dataURL = mergedCanvas!.toDataURL("image/png");
+    const dataURL = originCanvas.toDataURL("image/png");
 
     const link = document.createElement("a");
     link.href = dataURL;
@@ -416,16 +400,6 @@ const Editor = () => {
             id="origin-image-layer"
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
             ref={originImageLayerRef}
-          />
-          <canvas
-            id="blurred-image-layer"
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20"
-            ref={maskedLayerRef}
-          />
-          <canvas
-            id="drag-layer"
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30"
-            ref={dragLayerRef}
             onMouseDown={mouseDownHandler}
             onMouseMove={mouseMoveHandler}
             onMouseUp={mouseUpHandler}
