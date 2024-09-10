@@ -14,6 +14,7 @@ type MaskedArea = {
   y: number;
   width: number;
   height: number;
+  zoomLevel: number;
 };
 
 const INITIAL_MASKED_AREA = {
@@ -21,6 +22,7 @@ const INITIAL_MASKED_AREA = {
   y: 0,
   width: 0,
   height: 0,
+  zoomLevel: 1,
 };
 
 type EditorState = {
@@ -113,9 +115,7 @@ const Editor = () => {
   const [maskedArea, setMaskedArea] = useState<MaskedArea>(INITIAL_MASKED_AREA);
   const [fileName, setFileName] = useState("");
 
-  const originImageLayerRef = useRef<HTMLCanvasElement | null>(null);
-  const blurredImageLayerRef = useRef<HTMLCanvasElement | null>(null);
-  const dragLayerRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const fileChangeHandler: ChangeEventHandler<HTMLInputElement> = (e) => {
     if (e.target.files) {
@@ -128,16 +128,26 @@ const Editor = () => {
   };
 
   const getCanvasCoordinates = (event: MouseEvent) => {
-    const canvas = blurredImageLayerRef.current;
+    const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+
+    // Calculate the scale factor based on the zoom level
+    const scaleFactor = 1 / state.zoomLevel;
+
+    // Get the position of the mouse relative to the canvas
+    const canvasX = event.clientX - rect.left;
+    const canvasY = event.clientY - rect.top;
+
+    // Apply the scale factor to adjust for zoom
+    // We don't need to subtract any offset because the canvas is not centered
+    const adjustedX = canvasX * scaleFactor;
+    const adjustedY = canvasY * scaleFactor;
 
     return {
-      x: ((event.clientX - rect.left) * scaleX) / state.zoomLevel,
-      y: ((event.clientY - rect.top) * scaleY) / state.zoomLevel,
+      x: adjustedX,
+      y: adjustedY,
     };
   };
 
@@ -148,8 +158,8 @@ const Editor = () => {
 
     setMaskedArea({
       ...INITIAL_MASKED_AREA,
-      x,
-      y,
+      x: x,
+      y: y,
     });
   };
 
@@ -173,7 +183,7 @@ const Editor = () => {
     if (maskedArea.width !== 0 && maskedArea.height !== 0) {
       dispatch({
         type: "masked",
-        payload: { ...maskedArea },
+        payload: { ...maskedArea, zoomLevel: state.zoomLevel },
       });
     }
 
@@ -182,74 +192,66 @@ const Editor = () => {
     setMaskedArea(() => INITIAL_MASKED_AREA);
   };
 
-  const drawDragArea = () => {
-    const canvas = dragLayerRef.current;
-    const context = canvas!.getContext("2d");
-
-    context!.clearRect(0, 0, canvas!.width, canvas!.height);
-    context!.save();
-
-    if (maskedArea.width === 0 || maskedArea.height === 0) {
+  const drawDragArea = (ctx: CanvasRenderingContext2D | null) => {
+    if (!ctx) {
       return;
     }
 
-    context!.scale(state.zoomLevel, state.zoomLevel);
-    context!.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.fillStyle = "rgba(255,0,0,0.2)";
 
-    context?.fillRect(
+    ctx.fillRect(
       maskedArea.x,
       maskedArea.y,
       maskedArea.width,
       maskedArea.height
     );
 
-    context!.restore();
+    drawMaskedAreas(ctx);
   };
-  useEffect(drawDragArea, [maskedArea]);
 
-  const drawOriginImageLayer = () => {
-    const canvas = originImageLayerRef.current;
+  const drawImageWithMaskedAreas = () => {
+    const canvas = canvasRef.current;
 
     if (!canvas || !state.originImageSource) {
       return;
     }
 
-    const context = canvas.getContext("2d");
+    const originImageLayerContext = canvas.getContext("2d", {
+      willReadFrequently: true,
+    });
+
     const image = new Image();
     image.src = state.originImageSource;
 
-    context!.clearRect(0, 0, canvas.width, canvas.height);
-
     image.onload = () => {
-      context!.save();
-      context!.scale(state.zoomLevel, state.zoomLevel);
-      context!.drawImage(image, 0, 0);
-      context!.restore();
+      canvas.width = Math.round(image.width * state.zoomLevel);
+      canvas.height = Math.round(image.height * state.zoomLevel);
+
+      originImageLayerContext!.save();
+      originImageLayerContext!.scale(state.zoomLevel, state.zoomLevel);
+      originImageLayerContext!.drawImage(image, 0, 0);
+      drawDragArea(originImageLayerContext);
     };
+
+    originImageLayerContext!.restore();
   };
-  useEffect(drawOriginImageLayer, [state.originImageSource, state.zoomLevel]);
+  useEffect(drawImageWithMaskedAreas, [
+    state.originImageSource,
+    state.zoomLevel,
+    maskedArea,
+    state.maskedAreas,
+  ]);
 
-  const drawMaskedAreas = () => {
-    const canvas = blurredImageLayerRef.current;
-
-    if (!canvas || state.maskedAreas.length === 0 || !state.originImageSource) {
+  const drawMaskedAreas = (ctx: CanvasRenderingContext2D | null) => {
+    if (!ctx) {
       return;
     }
 
-    const context = canvas.getContext("2d");
-
-    context!.clearRect(0, 0, canvas.width, canvas.height);
-    context!.save();
-    context!.scale(state.zoomLevel, state.zoomLevel);
-
     state.maskedAreas.forEach((area) => {
-      context!.fillStyle = "rgba(255,255,255,1)";
-      context!.fillRect(area.x, area.y, area.width, area.height);
+      ctx!.fillStyle = "rgba(255,0,0,1)";
+      ctx!.fillRect(area.x, area.y, area.width, area.height);
     });
-
-    context!.restore();
   };
-  useEffect(drawMaskedAreas, [state.maskedAreas, state.zoomLevel]);
 
   const onUndoHandler = () => {
     if (state.currentStep <= 0) return;
@@ -272,9 +274,13 @@ const Editor = () => {
   };
 
   const onDownloadHandler = () => {
-    const canvas = originImageLayerRef.current;
+    const originCanvas = canvasRef.current;
 
-    const dataURL = canvas!.toDataURL("image/png");
+    if (!originCanvas) {
+      return;
+    }
+
+    const dataURL = originCanvas.toDataURL("image/png");
 
     const link = document.createElement("a");
     link.href = dataURL;
@@ -284,7 +290,7 @@ const Editor = () => {
   };
 
   return (
-    <div className="border rounded-md flex flex-col w-fit h-fit">
+    <div className="border rounded-md flex flex-col w-fit h-fit bg-slate-600">
       <EditorPanel
         onUndoHandler={onUndoHandler}
         onRedoHandler={onRedoHandler}
@@ -292,48 +298,28 @@ const Editor = () => {
         onZoomInHandler={onZoomInHandler}
         onZoomOutHandler={onZoomOutHandler}
       />
-      <div className="flex-1 flex flex-col justify-center items-center">
-        <div>
-          <input
-            id="fileInput"
-            type="file"
-            className="p-3 hidden"
-            accept="image/png, image/jpeg, image/jpg"
-            onChange={fileChangeHandler}
-          />
-          <label htmlFor="fileInput" className="cursor-pointer">
-            Select File
-          </label>
-        </div>
-        <div
-          className="flex justify-center items-center relative"
-          style={{ width: "850px", height: "500px" }}
-        >
-          <canvas
-            id="origin-image-layer"
-            className="absolute left-0 top-0 z-10"
-            ref={originImageLayerRef}
-            width={850}
-            height={500}
-          />
-          <canvas
-            id="blurred-image-layer"
-            className="absolute left-0 top-0 z-20"
-            ref={blurredImageLayerRef}
-            width={850}
-            height={500}
-          />
-          <canvas
-            id="drag-layer"
-            className="absolute left-0 top-0 z-30"
-            width={850}
-            height={500}
-            ref={dragLayerRef}
-            onMouseDown={mouseDownHandler}
-            onMouseMove={mouseMoveHandler}
-            onMouseUp={mouseUpHandler}
-          />
-        </div>
+      <div>
+        <input
+          id="fileInput"
+          type="file"
+          className="p-3 hidden"
+          accept="image/png, image/jpeg, image/jpg"
+          onChange={fileChangeHandler}
+        />
+        <label htmlFor="fileInput" className="cursor-pointer">
+          Select File
+        </label>
+      </div>
+      <div
+        className="overflow-auto"
+        style={{ width: "700px", height: "500px" }}
+      >
+        <canvas
+          ref={canvasRef}
+          onMouseDown={mouseDownHandler}
+          onMouseMove={mouseMoveHandler}
+          onMouseUp={mouseUpHandler}
+        />
       </div>
     </div>
   );
